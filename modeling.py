@@ -20,7 +20,14 @@ def save_models(models):
     model_filename = 'models.pkl'
     with open(model_filename, 'wb') as file:
         pickle.dump(models, file)
-    
+
+
+def load_models():
+    model_filename = 'models.pkl'
+    with open(model_filename, 'rb') as file:
+        models = pickle.load(file)
+    return models
+
 
 def preprocessing_trains(trains):
     trains['start_month'] = pd.to_datetime(trains['start_id'].str[0:10], format='%d.%m.%Y').dt.month
@@ -131,6 +138,28 @@ def create_models(df, columns_list):
     return [fit_models, metrics, scores]
 
 
+def prediction(df, models, columns_list):
+    logging.info('Started preprocessing')
+    update_trains = preprocessing_update_trains(df)
+    logging.info('Preprocessing done')
+    update_X = update_trains[columns_list]
+    logging.info('Predicting')
+    for name, model in models.items():
+        logging.info(f'predicting for model {name} started')
+        update_Y = model.predict(update_X)
+        logging.info(f'predicting for model {name} finished')
+        duration = 'duration_' + name
+        update_trains[duration] = pd.to_numeric(update_Y).astype(float)
+        expected_delivery = 'expected_delivery_' + name
+        update_trains[expected_delivery] = pd.to_datetime(update_trains['update']) + pd.to_timedelta(update_trains[duration], unit='D')
+        update_trains = update_trains.sort_values(expected_delivery)
+        cumulative_delivery = 'cumulative deliveries_' + name
+        update_trains[cumulative_delivery] = update_trains['котлов'].cumsum()
+    logging.info('Predicting done')
+    return update_trains
+
+    
+    
 
 
 if __name__ == "__main__":
