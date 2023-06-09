@@ -1,0 +1,50 @@
+2023-06-10 03:18:01,936 INFO: Started preprocessing
+2023-06-10 03:18:02,048 INFO: Preprocessing done
+2023-06-10 03:18:02,053 INFO: Filtering done
+2023-06-10 03:18:02,081 INFO: Data setup done
+2023-06-10 03:18:02,082 INFO: Fitting models
+2023-06-10 03:18:02,082 INFO: fitting model RandomForest started
+2023-06-10 03:18:15,204 INFO: fitting model RandomForest finished
+2023-06-10 03:18:15,204 INFO: fitting model DecisionTree started
+2023-06-10 03:18:15,260 INFO: fitting model DecisionTree finished
+2023-06-10 03:18:15,260 INFO: fitting model KNeighbors started
+2023-06-10 03:18:15,281 INFO: fitting model KNeighbors finished
+2023-06-10 03:18:15,281 INFO: fitting model ExtraTrees started
+2023-06-10 03:18:22,634 INFO: fitting model ExtraTrees finished
+2023-06-10 03:18:22,634 INFO: fitting model GradientBoosting started
+2023-06-10 03:18:27,659 INFO: fitting model GradientBoosting finished
+2023-06-10 03:18:27,659 INFO: All models fitted
+2023-06-10 03:18:27,659 INFO: Calculating metrics
+2023-06-10 03:18:27,660 INFO: predicting for model RandomForest started
+2023-06-10 03:18:28,070 INFO: predicting for model RandomForest finished
+2023-06-10 03:18:28,070 INFO: predicting for model DecisionTree started
+2023-06-10 03:18:28,075 INFO: predicting for model DecisionTree finished
+2023-06-10 03:18:28,075 INFO: predicting for model KNeighbors started
+2023-06-10 03:18:28,251 INFO: predicting for model KNeighbors finished
+2023-06-10 03:18:28,251 INFO: predicting for model ExtraTrees started
+2023-06-10 03:18:28,933 INFO: predicting for model ExtraTrees finished
+2023-06-10 03:18:28,933 INFO: predicting for model GradientBoosting started
+2023-06-10 03:18:28,959 INFO: predicting for model GradientBoosting finished
+2023-06-10 03:18:28,960 INFO: Metrics calculated
+2023-06-10 03:18:28,964 INFO: Metrics: 
+      RandomForest  DecisionTree  KNeighbors  ExtraTrees  GradientBoosting
+MAE       0.550494      0.522173    0.772795    0.492706          1.262185
+MSE       1.432134      1.780948    2.234332    1.310929          3.607315
+RMSE      1.196718      1.334522    1.494768    1.144958          1.899293
+2023-06-10 03:18:28,964 INFO: Calculating scores
+2023-06-10 03:18:28,964 INFO: scoring for model RandomForest started
+2023-06-10 03:18:46,493 INFO: scoring for model RandomForest finished
+2023-06-10 03:18:46,493 INFO: scoring for model DecisionTree started
+2023-06-10 03:18:46,586 INFO: scoring for model DecisionTree finished
+2023-06-10 03:18:46,586 INFO: scoring for model KNeighbors started
+2023-06-10 03:18:46,658 INFO: scoring for model KNeighbors finished
+2023-06-10 03:18:46,658 INFO: scoring for model ExtraTrees started
+2023-06-10 03:18:57,320 INFO: scoring for model ExtraTrees finished
+2023-06-10 03:18:57,320 INFO: scoring for model GradientBoosting started
+2023-06-10 03:19:02,970 INFO: scoring for model GradientBoosting finished
+2023-06-10 03:19:02,971 INFO: Scores calculated
+2023-06-10 03:19:02,974 INFO: Scores: 
+      RandomForest  DecisionTree  KNeighbors  ExtraTrees  GradientBoosting
+Mean      3.475426      4.767509    5.966939    3.319772          4.909895
+Std       0.323254      0.457182    0.297084    0.381034          0.350156
+2023-06-10 03:19:03,964 INFO: no errors found, models saved
