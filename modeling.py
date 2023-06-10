@@ -1,19 +1,15 @@
 import pandas as pd
-import datetime as dt
 from scipy.signal import savgol_filter, filtfilt, butter
-import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import pickle
 from typing import Dict, List, Tuple
 import logging
-
 
 
 def save_models(models):
@@ -76,6 +72,7 @@ def smooth_data(data, filter_type=None):
 
     return smooth_data
 
+
 def cross_validation_test(models, X, y):
     scoring_metric = 'neg_mean_squared_error'
     num_folds = 5
@@ -89,8 +86,6 @@ def cross_validation_test(models, X, y):
     scores.index = ['Mean', 'Std']
     return scores
 
-import logging
-
 
 def get_models_metrics(models, X_test, y_test):
     models_metrics = {}
@@ -103,6 +98,7 @@ def get_models_metrics(models, X_test, y_test):
     metrics = pd.DataFrame(models_metrics)
     metrics.index = ['MAE', 'MSE', 'RMSE']
     return metrics
+
 
 def create_models(df, columns_list):
     logging.info('Started preprocessing')
@@ -158,14 +154,6 @@ def prediction(df, models, columns_list):
     logging.info('Predicting done')
     return update_trains
 
-    
-    
-
 
 if __name__ == "__main__":
-    '''
-    filename = '/Users/sergeykuzmin/projects/machine_learning/data/2Home_data.xlsx'
-    df = pd.read_excel(filename)
-    print('file loaded')
-    df.drop(df[df['update'] >= pd.to_datetime('2023-05-01')].index, inplace=True)
-    create_models(df, ['DLeft', 'start', 'ops station', 'o_road']) '''
+    pass

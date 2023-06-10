@@ -1,16 +1,22 @@
-2023-06-10 07:19:18,738 INFO: Loading models
-2023-06-10 07:19:19,331 INFO: Models loaded
-2023-06-10 07:19:19,332 INFO: Started preprocessing
-2023-06-10 07:19:19,689 INFO: Preprocessing done
-2023-06-10 07:19:19,691 INFO: Predicting
-2023-06-10 07:19:19,691 INFO: predicting for model RandomForest started
-2023-06-10 07:19:20,911 INFO: predicting for model RandomForest finished
-2023-06-10 07:19:20,953 INFO: predicting for model DecisionTree started
-2023-06-10 07:19:20,960 INFO: predicting for model DecisionTree finished
-2023-06-10 07:19:21,003 INFO: predicting for model KNeighbors started
-2023-06-10 07:19:21,366 INFO: predicting for model KNeighbors finished
-2023-06-10 07:19:21,414 INFO: predicting for model ExtraTrees started
-2023-06-10 07:19:22,573 INFO: predicting for model ExtraTrees finished
-2023-06-10 07:19:22,628 INFO: predicting for model GradientBoosting started
-2023-06-10 07:19:22,791 INFO: predicting for model GradientBoosting finished
-2023-06-10 07:19:22,850 INFO: Predicting done
+2023-06-10 15:24:22,754 INFO: start
+2023-06-10 15:24:30,306 INFO: recieved 15 letters
+2023-06-10 15:24:30,306 INFO: predicting data
+2023-06-10 15:25:00,119 INFO: Loading models
+2023-06-10 15:25:00,988 INFO: Models loaded
+2023-06-10 15:25:00,988 INFO: Started preprocessing
+2023-06-10 15:25:01,292 INFO: Preprocessing done
+2023-06-10 15:25:01,294 INFO: Predicting
+2023-06-10 15:25:01,294 INFO: predicting for model RandomForest started
+2023-06-10 15:25:02,599 INFO: predicting for model RandomForest finished
+2023-06-10 15:25:02,641 INFO: predicting for model DecisionTree started
+2023-06-10 15:25:02,649 INFO: predicting for model DecisionTree finished
+2023-06-10 15:25:02,699 INFO: predicting for model KNeighbors started
+2023-06-10 15:25:03,083 INFO: predicting for model KNeighbors finished
+2023-06-10 15:25:03,192 INFO: predicting for model ExtraTrees started
+2023-06-10 15:25:04,475 INFO: predicting for model ExtraTrees finished
+2023-06-10 15:25:04,528 INFO: predicting for model GradientBoosting started
+2023-06-10 15:25:04,699 INFO: predicting for model GradientBoosting finished
+2023-06-10 15:25:04,757 INFO: Predicting done
+2023-06-10 15:26:14,209 INFO: updated data on trains compiled
+2023-06-10 15:26:28,159 INFO: updates sent, no error found
+2023-06-10 15:28:07,256 INFO: update saved locally
