@@ -1,3 +1,8 @@
 mail_settings.py
 models.pkl
 2Home_data.xlsx
+.DS_Store
+TH_0105_0906.xlsx
+__pycache__/
+update_trains.xlsx
+update_trains1.xlsx
