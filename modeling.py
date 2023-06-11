@@ -131,7 +131,7 @@ def create_models(df, columns_list):
     scores = cross_validation_test(models, X_test, y_test)
     logging.info('Scores calculated')
     logging.info(f"Scores: \n{scores.to_string(index=True, line_width=80)}")
-    return [fit_models, metrics, scores]
+    return [fit_models, metrics, scores, columns_list]
 
 
 def prediction(df, models, columns_list):
@@ -140,6 +140,7 @@ def prediction(df, models, columns_list):
     logging.info('Preprocessing done')
     update_X = update_trains[columns_list]
     logging.info('Predicting')
+    columns_to_keep = []
     for name, model in models.items():
         logging.info(f'predicting for model {name} started')
         update_Y = model.predict(update_X)
@@ -151,7 +152,13 @@ def prediction(df, models, columns_list):
         update_trains = update_trains.sort_values(expected_delivery)
         cumulative_delivery = 'cumulative deliveries_' + name
         update_trains[cumulative_delivery] = update_trains['котлов'].cumsum()
+        columns_to_keep.append(duration)
+        columns_to_keep.append(expected_delivery)
     logging.info('Predicting done')
+    columns_to_keep.append('update')
+    columns_to_keep.append('котлов')
+    columns_to_keep.append('_num')
+    update_trains = update_trains[columns_to_keep]
     return update_trains
 
 

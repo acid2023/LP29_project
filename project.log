@@ -1,22 +1,36 @@
-2023-06-10 15:24:22,754 INFO: start
-2023-06-10 15:24:30,306 INFO: recieved 15 letters
-2023-06-10 15:24:30,306 INFO: predicting data
-2023-06-10 15:25:00,119 INFO: Loading models
-2023-06-10 15:25:00,988 INFO: Models loaded
-2023-06-10 15:25:00,988 INFO: Started preprocessing
-2023-06-10 15:25:01,292 INFO: Preprocessing done
-2023-06-10 15:25:01,294 INFO: Predicting
-2023-06-10 15:25:01,294 INFO: predicting for model RandomForest started
-2023-06-10 15:25:02,599 INFO: predicting for model RandomForest finished
-2023-06-10 15:25:02,641 INFO: predicting for model DecisionTree started
-2023-06-10 15:25:02,649 INFO: predicting for model DecisionTree finished
-2023-06-10 15:25:02,699 INFO: predicting for model KNeighbors started
-2023-06-10 15:25:03,083 INFO: predicting for model KNeighbors finished
-2023-06-10 15:25:03,192 INFO: predicting for model ExtraTrees started
-2023-06-10 15:25:04,475 INFO: predicting for model ExtraTrees finished
-2023-06-10 15:25:04,528 INFO: predicting for model GradientBoosting started
-2023-06-10 15:25:04,699 INFO: predicting for model GradientBoosting finished
-2023-06-10 15:25:04,757 INFO: Predicting done
-2023-06-10 15:26:14,209 INFO: updated data on trains compiled
-2023-06-10 15:26:28,159 INFO: updates sent, no error found
-2023-06-10 15:28:07,256 INFO: update saved locally
+2023-06-12 01:43:25,972 INFO: start
+2023-06-12 01:43:31,471 INFO: recieved 17 letters
+2023-06-12 01:43:31,472 INFO: authorizing user from letter 0
+2023-06-12 01:43:31,473 INFO: user not authorized
+2023-06-12 01:43:31,473 INFO: authorizing user from letter 1
+2023-06-12 01:43:31,473 INFO: user not authorized
+2023-06-12 01:43:31,473 INFO: authorizing user from letter 2
+2023-06-12 01:43:31,473 INFO: user not authorized
+2023-06-12 01:43:31,473 INFO: authorizing user from letter 3
+2023-06-12 01:43:31,474 INFO: user not authorized
+2023-06-12 01:43:31,474 INFO: authorizing user from letter 4
+2023-06-12 01:43:31,474 INFO: user not authorized
+2023-06-12 01:43:31,474 INFO: authorizing user from letter 5
+2023-06-12 01:43:31,474 INFO: user not authorized
+2023-06-12 01:43:31,474 INFO: authorizing user from letter 6
+2023-06-12 01:43:31,474 INFO: user not authorized
+2023-06-12 01:43:31,474 INFO: authorizing user from letter 7
+2023-06-12 01:43:31,474 INFO: user not authorized
+2023-06-12 01:43:31,475 INFO: authorizing user from letter 8
+2023-06-12 01:43:31,475 INFO: user not authorized
+2023-06-12 01:43:31,475 INFO: authorizing user from letter 9
+2023-06-12 01:43:31,475 INFO: user not authorized
+2023-06-12 01:43:31,475 INFO: authorizing user from letter 10
+2023-06-12 01:43:31,475 INFO: user not authorized
+2023-06-12 01:43:31,475 INFO: authorizing user from letter 11
+2023-06-12 01:43:31,476 INFO: user not authorized
+2023-06-12 01:43:31,476 INFO: authorizing user from letter 12
+2023-06-12 01:43:31,476 INFO: user not authorized
+2023-06-12 01:43:31,476 INFO: authorizing user from letter 13
+2023-06-12 01:43:31,476 INFO: user not authorized
+2023-06-12 01:43:31,476 INFO: authorizing user from letter 14
+2023-06-12 01:43:31,476 INFO: user not authorized
+2023-06-12 01:43:31,476 INFO: authorizing user from letter 15
+2023-06-12 01:43:31,477 INFO: user not authorized
+2023-06-12 01:43:31,477 INFO: authorizing user from letter 16
+2023-06-12 01:43:31,477 INFO: authorizing user done
