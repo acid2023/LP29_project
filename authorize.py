@@ -4,6 +4,7 @@ import base64
 import mail_settings as ms
 import re
 
+
 def get_text_body_from_message(message):
     text_parts = []
     for part in message.walk():
@@ -32,7 +33,7 @@ def get_signature(letter):
         return signature.encode('utf-8')
     else:
         return None
-    
+
 
 def verify_signature(username, signature):
     expected_signature = generate_signature(username)
@@ -52,6 +53,7 @@ def authorize_user(letter):
         else:
             return False
     return False
+
 
 def create_new_user(letter):
     pattern = r'new_user\s*=\s*[«"](.*?)[»"]'

@@ -1,7 +1,6 @@
 import email
 import imaplib
 from email.header import decode_header
-import base64
 import re
 import mail_settings as ms
 from authorize import authorize_user, create_new_user
@@ -10,7 +9,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
-from email import encoders
 import io
 import modeling as md
 import logging
@@ -86,12 +84,13 @@ def get_text_body_from_message(message):
     text = '\n'.join(text_parts)
     return text
 
+
 def get_columns_list_from_message(letter):
     default_columns = ['DLeft', 'start_month', 'start_day', 'start', 'ops station', 'o_road', 'update_month', 'update_day']
     message = letter['message']
-    message = message.decode('utf-8')
-    pattern = r'list of columns: \[(.*?)\]'  
-    match = re.search(pattern, message)
+    letter_test = get_text_body_from_message(message)
+    pattern = r'list of columns: \[(.*?)\]'
+    match = re.search(pattern, letter_test)
     if match:
         column_str = match.group(1)
         columns = [col.strip() for col in column_str.split(',')]
@@ -170,6 +169,7 @@ def create_models(letter):
     print('logs saved, no error found')
     logging.info('no errors found, models saved')
 
+
 def predict_data(letter):
     print('predicting data')
     logging.info('predicting data')
@@ -193,6 +193,7 @@ def predict_data(letter):
     logging.info('updates sent, no error found')
     forecast.to_excel('update_trains.xlsx')
     logging.info('update saved locally')
+
 
 def main():
     emails = get_messages(all_messages=True)
@@ -223,7 +224,7 @@ if __name__ == "__main__":
     start_logging()
     logging.info('start')
     print('logging on')
-    try: 
+    try:
         main()
     except Exception as e:
         print('error found, see logs')
@@ -234,4 +235,3 @@ if __name__ == "__main__":
         except:
             logging.info('logs not sent')
             print('error')
-
