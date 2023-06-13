@@ -7,21 +7,48 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
 import pickle
 from typing import Dict, List, Tuple
 import logging
+import modeling_settings as mds
 
 
 def save_models(models):
-    model_filename = 'models.pkl'
+    model_filename = 'models_sklearn.pkl'
+    sklearn_models = {}
+    models_list = []
+    for model_name, model in models[0].items():
+        if model_name in mds.TS_models_list:
+            models_list.append(model_name)
+            ts_filename = f'{model_name}.h5'
+            model.save(ts_filename)
+        else:
+            sklearn_models[model_name] = model
     with open(model_filename, 'wb') as file:
-        pickle.dump(models, file)
+        pickle.dump(sklearn_models, file)
+    with open('models_list.pkl', 'wb') as file:
+        pickle.dump(models_list, file)
+    with open('models_metrics.pkl', 'wb') as file:
+        pickle.dump(models[1], file)
+    with open('models_scores.pkl', 'wb') as file:
+        pickle.dump(models[2], file)
+    with open('columns_list.pkl', 'wb') as file:
+        pickle.dump(models[3], file)
 
 
 def load_models():
-    model_filename = 'models.pkl'
+    with open('models_list.pkl', 'rb') as file:
+        models_list = pickle.load(file)
+    model_filename = 'models_sklearn.pkl'
     with open(model_filename, 'rb') as file:
         models = pickle.load(file)
+    for model_name in mds.TS_models_list:
+        ts_filename = f'{model_name}.h5'
+        model = keras.models.load_model(ts_filename)
+        models[model_name] = model
     return models
 
 
@@ -78,10 +105,14 @@ def cross_validation_test(models, X, y):
     num_folds = 5
     scores = {}
     for name, model in models.items():
-        logging.info(f'scoring for model {name} started')
-        cross_scores = cross_val_score(estimator=model, X=X, y=y, cv=num_folds, scoring=scoring_metric)
-        scores[name] = [-cross_scores.mean(), cross_scores.std()]
-        logging.info(f'scoring for model {name} finished')
+        if name in mds.TS_models_list:
+            logging.info('TensorFlow models, no scoring')
+            scores[name] = [0, 0]
+        else:
+            logging.info(f'scoring for model {name} started')
+            cross_scores = cross_val_score(estimator=model, X=X, y=y, cv=num_folds, scoring=scoring_metric)
+            scores[name] = [-cross_scores.mean(), cross_scores.std()]
+            logging.info(f'scoring for model {name} finished')
     scores = pd.DataFrame(scores)
     scores.index = ['Mean', 'Std']
     return scores
@@ -116,11 +147,35 @@ def create_models(df, columns_list):
               'DecisionTree': DecisionTreeRegressor(max_depth=1000, random_state=42),
               'KNeighbors': KNeighborsRegressor(n_neighbors=5),
               'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=300, max_depth=100),
-              'GradientBoosting': GradientBoostingRegressor(n_estimators=300, learning_rate=0.75, random_state=42)}
+              'GradientBoosting': GradientBoostingRegressor(n_estimators=300, learning_rate=0.75, random_state=42),
+              'TensorFlow_Elu_Rmsprop': keras.Sequential([layers.Dense(128, activation='elu', input_shape=[len(columns_list)]),
+                                                          layers.Dense(128, activation='elu'), 
+                                                          layers.Dense(1)])
+                                                          ,
+              'TensorFlow_Softplus_Nadam': keras.Sequential([layers.Dense(128, activation='softplus', input_shape=[len(columns_list)]),
+                                                             layers.Dense(128, activation= 'softplus'),
+                                                             layers.Dense(1)])
+                                                             ,
+              'TensorFlow_Synthetic': keras.Sequential([layers.Dense(128, activation='elu', input_shape=[len(columns_list)]),
+                                                        layers.Dense(128, activation='relu'), 
+                                                        layers.Dense(128, activation='softplus'),
+                                                        layers.Dense(128, activation='softplus'), 
+                                                        layers.Dense(1)])}
     fit_models = {}
     for name, model in models.items():
         logging.info(f'fitting model {name} started')
-        fit_models[name] = model.fit(X_train, y_train)
+        if name == 'TensorFlow_Elu_Rmsprop' or name == 'TensorFlow_Synthetic':
+            model.compile(loss='mean_squared_error', optimizer=keras.optimizers.RMSprop(learning_rate=0.001))
+            keras.optimizers.RMSprop(learning_rate=0.001).build(model.trainable_variables)
+            model.fit(X_train, y_train, epochs=30, batch_size=32, validation_data=(X_test, y_test)) 
+            fit_models[name] = model
+        elif name == 'TensorFlow_Softplus_Nadam':
+            model.compile(loss='mean_squared_error', optimizer=keras.optimizers.Nadam(learning_rate=0.001))
+            keras.optimizers.Nadam(learning_rate=0.001).build(model.trainable_variables)
+            model.fit(X_train, y_train, epochs=30, batch_size=32, validation_data=(X_test, y_test))
+            fit_models[name] = model
+        else:         
+            fit_models[name] = model.fit(X_train, y_train)
         logging.info(f'fitting model {name} finished')
     logging.info('All models fitted')
     logging.info('Calculating metrics')
@@ -145,13 +200,14 @@ def prediction(df, models, columns_list):
         logging.info(f'predicting for model {name} started')
         update_Y = model.predict(update_X)
         logging.info(f'predicting for model {name} finished')
+        logging.info(update_Y)
+        logging.info(type(update_Y))
         duration = 'duration_' + name
-        update_trains[duration] = pd.to_numeric(update_Y).astype(float)
+        update_trains[duration] = pd.DataFrame(update_Y)#.astype(float)
         expected_delivery = 'expected_delivery_' + name
         update_trains[expected_delivery] = pd.to_datetime(update_trains['update']) + pd.to_timedelta(update_trains[duration], unit='D')
+        update_trains[expected_delivery] = update_trains[expected_delivery]
         update_trains = update_trains.sort_values(expected_delivery)
-        cumulative_delivery = 'cumulative deliveries_' + name
-        update_trains[cumulative_delivery] = update_trains['котлов'].cumsum()
         columns_to_keep.append(duration)
         columns_to_keep.append(expected_delivery)
     logging.info('Predicting done')

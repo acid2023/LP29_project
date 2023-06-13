@@ -6,3 +6,6 @@ TH_0105_0906.xlsx
 __pycache__/
 update_trains.xlsx
 update_trains1.xlsx
+*.log
+*.pkl
+*.h5

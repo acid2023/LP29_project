@@ -3,6 +3,7 @@ import hmac
 import base64
 import mail_settings as ms
 import re
+import logging
 
 
 def get_text_body_from_message(message):
@@ -16,7 +17,7 @@ def get_text_body_from_message(message):
 
 def generate_signature(username):
     username_bytes = username.encode('utf-8')
-    master_key = ms.master_mail.encode('utf-8')
+    master_key = ms.master_key.encode('utf-8')
     sha256_hash = hashlib.sha256(username_bytes)
     hmac_hash = hmac.new(master_key, sha256_hash.digest(), 'MD5')
     signature = base64.b64encode(hmac_hash.digest())
@@ -24,7 +25,7 @@ def generate_signature(username):
 
 
 def get_signature(letter):
-    pattern = r'signature="b\'([\w+/=]+)\'"'
+    pattern = r'signature=[\'"]b\'([\w+/=]+)\'[\'"]'
     message = letter['message']
     letter_text = get_text_body_from_message(message)
     match = re.search(pattern, letter_text)
@@ -49,21 +50,29 @@ def authorize_user(letter):
         sender = letter['sender']
         return_path = letter['return_path']
         if verify_signature(sender, signature) or verify_signature(return_path, signature):
+            logging.info('User %s authorized' % sender)
+            print('User %s authorized' % sender)
             return True
         else:
+            logging.info('User %s not authorized' % sender)
+            print('User %s is not authorized' % sender)
             return False
+        
     return False
 
 
-def create_new_user(letter):
+def generate_new_user_signature(letter):
     pattern = r'new_user\s*=\s*[«"](.*?)[»"]'
     message = letter['message']
     letter_text = get_text_body_from_message(message)
     match = re.search(pattern, letter_text)
     if match:
         email_address = match.group(1)
-        return generate_signature(email_address)
+        signature = generate_signature(email_address)
+        logging.info('sugnature generated')
+        return signature
     else:
+        logging.info('signature was not generated')
         return None
 
 
