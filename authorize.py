@@ -6,7 +6,7 @@ import re
 import logging
 
 
-def get_text_body_from_message(message):
+def get_text_body_from_message(message: object) -> str:
     text_parts = []
     for part in message.walk():
         if part.get_content_type() == 'text/plain':
@@ -51,13 +51,13 @@ def authorize_user(letter):
         return_path = letter['return_path']
         if verify_signature(sender, signature) or verify_signature(return_path, signature):
             logging.info('User %s authorized' % sender)
-            print('User %s authorized' % sender)
+            return True
+        elif sender == ms.master_mail or return_path == ms.master_mail:
+            logging.info('User %s authorized' % sender)
             return True
         else:
             logging.info('User %s not authorized' % sender)
-            print('User %s is not authorized' % sender)
             return False
-        
     return False
 
 

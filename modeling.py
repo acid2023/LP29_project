@@ -1,58 +1,53 @@
 import pandas as pd
 from scipy.signal import savgol_filter, filtfilt, butter
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
 import pickle
 from typing import Dict, List, Tuple
 import logging
 import modeling_settings as mds
+import folders
+from folders import folder_check
 
 
-def save_models(models):
-    model_filename = 'models_sklearn.pkl'
+def save_models(models: Dict):
+    path = folder_check(folders.models_folder)
+    model_filename = f'{path}models_sklearn.pkl'
     sklearn_models = {}
     models_list = []
     for model_name, model in models[0].items():
-        if model_name in mds.TS_models_list:
+        if model_name in mds.TF_models_list:
             models_list.append(model_name)
-            ts_filename = f'{model_name}.h5'
+            ts_filename = f'{path}{model_name}.h5'
             model.save(ts_filename)
         else:
             sklearn_models[model_name] = model
     with open(model_filename, 'wb') as file:
         pickle.dump(sklearn_models, file)
-    with open('models_list.pkl', 'wb') as file:
+    with open(f'{path}models_list.pkl', 'wb') as file:
         pickle.dump(models_list, file)
-    with open('models_metrics.pkl', 'wb') as file:
+    with open(f'{path}models_metrics.pkl', 'wb') as file:
         pickle.dump(models[1], file)
-    with open('models_scores.pkl', 'wb') as file:
+    with open(f'{path}models_scores.pkl', 'wb') as file:
         pickle.dump(models[2], file)
-    with open('columns_list.pkl', 'wb') as file:
+    with open(f'{path}columns_list.pkl', 'wb') as file:
         pickle.dump(models[3], file)
 
 
-def load_models():
-    with open('models_list.pkl', 'rb') as file:
-        models_list = pickle.load(file)
-    model_filename = 'models_sklearn.pkl'
+def load_models() -> Dict:
+    path = folder_check(folders.models_folder)
+    model_filename = f'{path}models_sklearn.pkl'
     with open(model_filename, 'rb') as file:
         models = pickle.load(file)
-    for model_name in mds.TS_models_list:
-        ts_filename = f'{model_name}.h5'
+    for model_name in mds.TF_models_list:
+        ts_filename = f'{path}{model_name}.h5'
         model = keras.models.load_model(ts_filename)
         models[model_name] = model
     return models
 
 
-def preprocessing_trains(trains):
+def preprocessing_trains(trains: pd.DataFrame) -> pd.DataFrame:
     trains['start_month'] = pd.to_datetime(trains['start_id'].str[0:10], format='%d.%m.%Y').dt.month
     trains['start_day'] = pd.to_datetime(trains['start_id'].str[0:10], format='%d.%m.%Y').dt.day
     trains['update_month'] = trains['update'].dt.month
@@ -65,7 +60,7 @@ def preprocessing_trains(trains):
     return trains
 
 
-def preprocessing_update_trains(update_trains):
+def preprocessing_update_trains(update_trains: pd.DataFrame) -> pd.DataFrame:
     update_trains.dropna(subset=['train_start', 'расстояние до Лены', 'op_station_index', 'ops station'], inplace=True)
     update_trains.train_start = update_trains.train_start.astype(int)
     update_trains['start_month'] = pd.to_datetime(update_trains['start_id'].str[0:10], format='%d.%m.%Y').dt.month
@@ -84,7 +79,7 @@ def preprocessing_update_trains(update_trains):
     return update_trains
 
 
-def smooth_data(data, filter_type=None):
+def smooth_data(data: pd.DataFrame, filter_type: str = 'none') -> pd.DataFrame:
     if filter_type == 'savgol':
         window_size = 100
         poly_order = 1
@@ -96,21 +91,21 @@ def smooth_data(data, filter_type=None):
         smooth_data = filtfilt(b, a, data)
     else:
         smooth_data = data
-
     return smooth_data
 
 
-def cross_validation_test(models, X, y):
+def cross_validation_test(models: Dict, metrics_data: List) -> pd.DataFrame:
     scoring_metric = 'neg_mean_squared_error'
     num_folds = 5
     scores = {}
     for name, model in models.items():
-        if name in mds.TS_models_list:
+        X_test, y_test = metrics_data[name]
+        if name in mds.TF_models_list:
             logging.info('TensorFlow models, no scoring')
             scores[name] = [0, 0]
-        else:
-            logging.info(f'scoring for model {name} started')
-            cross_scores = cross_val_score(estimator=model, X=X, y=y, cv=num_folds, scoring=scoring_metric)
+        elif name in mds.sklearn_list:
+            logging.info(f'SKLearn model, scoring for model {name} started')
+            cross_scores = cross_val_score(estimator=model, X=X_test, y=y_test, cv=num_folds, scoring=scoring_metric)
             scores[name] = [-cross_scores.mean(), cross_scores.std()]
             logging.info(f'scoring for model {name} finished')
     scores = pd.DataFrame(scores)
@@ -118,12 +113,15 @@ def cross_validation_test(models, X, y):
     return scores
 
 
-def get_models_metrics(models, X_test, y_test):
+def get_models_metrics(models: Dict, metrics_data: pd.DataFrame) -> pd.DataFrame:
     models_metrics = {}
     for name, model in models.items():
+        X_test, y_test = metrics_data[name]
         logging.info(f'predicting for model {name} started')
         y_pred = model.predict(X_test)
-        mae, mse, rmse = mean_absolute_error(y_test, y_pred), mean_squared_error(y_test, y_pred), mean_squared_error(y_test, y_pred, squared=False)
+        mae = mean_absolute_error(y_test, y_pred)
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = mean_squared_error(y_test, y_pred, squared=False)
         models_metrics[name] = [mae, mse, rmse]
         logging.info(f'predicting for model {name} finished')
     metrics = pd.DataFrame(models_metrics)
@@ -131,83 +129,70 @@ def get_models_metrics(models, X_test, y_test):
     return metrics
 
 
-def create_models(df, columns_list):
+def create_models(df: pd.DataFrame, columns_list: List) -> List:
     logging.info('Started preprocessing')
     trains = preprocessing_trains(df)
     logging.info('Preprocessing done')
-    smoothing_factor = 'savgol'
-    trains['target'] = smooth_data(trains['to_home'], smoothing_factor)
+    trains['target'] = smooth_data(trains['to_home'], mds.filter_type)
     logging.info('Filtering done')
-    X = trains[columns_list]
-    y = trains['target']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    logging.info('Data setup done')
     logging.info('Fitting models')
-    models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=42, max_depth=100),
-              'DecisionTree': DecisionTreeRegressor(max_depth=1000, random_state=42),
-              'KNeighbors': KNeighborsRegressor(n_neighbors=5),
-              'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=300, max_depth=100),
-              'GradientBoosting': GradientBoostingRegressor(n_estimators=300, learning_rate=0.75, random_state=42),
-              'TensorFlow_Elu_Rmsprop': keras.Sequential([layers.Dense(128, activation='elu', input_shape=[len(columns_list)]),
-                                                          layers.Dense(128, activation='elu'), 
-                                                          layers.Dense(1)])
-                                                          ,
-              'TensorFlow_Softplus_Nadam': keras.Sequential([layers.Dense(128, activation='softplus', input_shape=[len(columns_list)]),
-                                                             layers.Dense(128, activation= 'softplus'),
-                                                             layers.Dense(1)])
-                                                             ,
-              'TensorFlow_Synthetic': keras.Sequential([layers.Dense(128, activation='elu', input_shape=[len(columns_list)]),
-                                                        layers.Dense(128, activation='relu'), 
-                                                        layers.Dense(128, activation='softplus'),
-                                                        layers.Dense(128, activation='softplus'), 
-                                                        layers.Dense(1)])}
+    logging.info(columns_list)
     fit_models = {}
-    for name, model in models.items():
+    metrics_data = {}
+    for name, model in mds.models.items():
         logging.info(f'fitting model {name} started')
-        if name == 'TensorFlow_Elu_Rmsprop' or name == 'TensorFlow_Synthetic':
-            model.compile(loss='mean_squared_error', optimizer=keras.optimizers.RMSprop(learning_rate=0.001))
-            keras.optimizers.RMSprop(learning_rate=0.001).build(model.trainable_variables)
-            model.fit(X_train, y_train, epochs=30, batch_size=32, validation_data=(X_test, y_test)) 
+        if name in mds.TF_models_list:
+            X = trains[mds.TF_DefaultColumns]
+        elif name in mds.sklearn_list:
+            X = trains[columns_list]
+        y = trains['target']
+        X_train, X_remains, y_train, y_remains = train_test_split(X, y, test_size=0.3, random_state=42)
+        X_val, X_test, y_val, y_test = train_test_split(X_remains, y_remains, test_size=0.5, random_state=42)
+        metrics_data[name] = [X_test, y_test]
+        if name in mds.TF_models_list:
+            model.compile(loss=mds.TF_loss[name], optimizer=mds.TF_optimizers[name], metrics=mds.TF_metrics)
+            mds.TF_optimizers[name].build(model.trainable_variables)
+            model.fit(X_train, y_train, epochs=mds.TF_number_of_epochs,
+                      batch_size=mds.TF_batch_size, validation_data=(X_val, y_val))
             fit_models[name] = model
-        elif name == 'TensorFlow_Softplus_Nadam':
-            model.compile(loss='mean_squared_error', optimizer=keras.optimizers.Nadam(learning_rate=0.001))
-            keras.optimizers.Nadam(learning_rate=0.001).build(model.trainable_variables)
-            model.fit(X_train, y_train, epochs=30, batch_size=32, validation_data=(X_test, y_test))
-            fit_models[name] = model
-        else:         
+        elif name in mds.sklearn_list:
             fit_models[name] = model.fit(X_train, y_train)
         logging.info(f'fitting model {name} finished')
     logging.info('All models fitted')
     logging.info('Calculating metrics')
-    metrics = get_models_metrics(models, X_test, y_test)
+    metrics = get_models_metrics(fit_models, metrics_data)
     logging.info('Metrics calculated')
     logging.info(f"Metrics: \n{metrics.to_string(index=True, line_width=80)}")
     logging.info('Calculating scores')
-    scores = cross_validation_test(models, X_test, y_test)
+    scores = cross_validation_test(fit_models, metrics_data)
     logging.info('Scores calculated')
     logging.info(f"Scores: \n{scores.to_string(index=True, line_width=80)}")
     return [fit_models, metrics, scores, columns_list]
 
 
-def prediction(df, models, columns_list):
+def prediction(df: pd.DataFrame, models: Dict, columns_list: List) -> pd.DataFrame:
     logging.info('Started preprocessing')
     update_trains = preprocessing_update_trains(df)
     logging.info('Preprocessing done')
-    update_X = update_trains[columns_list]
     logging.info('Predicting')
     columns_to_keep = []
     for name, model in models.items():
         logging.info(f'predicting for model {name} started')
+        if name in mds.sklearn_list:
+            update_X = update_trains[columns_list]
+        elif name in mds.TF_models_list:
+            update_X = update_trains[mds.TF_DefaultColumns]
         update_Y = model.predict(update_X)
-        logging.info(f'predicting for model {name} finished')
+        logging.info(update_X)
         logging.info(update_Y)
-        logging.info(type(update_Y))
+        logging.info(f'predicting for model {name} finished')
+        logging.debug(update_Y)
         duration = 'duration_' + name
-        update_trains[duration] = pd.DataFrame(update_Y)#.astype(float)
+        update_trains[duration] = pd.DataFrame(update_Y)
         expected_delivery = 'expected_delivery_' + name
-        update_trains[expected_delivery] = pd.to_datetime(update_trains['update']) + pd.to_timedelta(update_trains[duration], unit='D')
-        update_trains[expected_delivery] = update_trains[expected_delivery]
-        update_trains = update_trains.sort_values(expected_delivery)
+        timedelta = pd.to_timedelta(update_trains[duration], unit='D')
+        update_trains[expected_delivery] = pd.to_datetime(update_trains['update']) + timedelta
+        update_trains[expected_delivery] = pd.to_datetime(update_trains[expected_delivery])
         columns_to_keep.append(duration)
         columns_to_keep.append(expected_delivery)
     logging.info('Predicting done')
