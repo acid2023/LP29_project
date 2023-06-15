@@ -37,11 +37,11 @@ models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=4
           # 'SVR_rbf': SVR(kernel=SVR_kernel[2], gamma=0.1),
           # 'SVR_sigmoid': SVR(kernel=SVR_kernel[3], gamma=0.1, coef0=0.0),
           'AdaBoost': AdaBoostRegressor(random_state=42, n_estimators=300),
-          'TensorFlow_Selu_Adam': keras.Sequential([layers.Dense(TF_neurons, activation='relu',
-                                                                 input_shape=[len(TF_DefaultColumns)]),
-                                                   layers.Dense(TF_neurons, activation='elu'),
-                                                   layers.Dense(TF_neurons, activation='selu'),
-                                                   layers.Dense(1)]),
+          'TensorFlow_Relu_Elu_Selu_Nadam': keras.Sequential([layers.Dense(TF_neurons, activation='relu',
+                                                              input_shape=[len(TF_DefaultColumns)]),
+                                                              layers.Dense(TF_neurons, activation='elu'),
+                                                              layers.Dense(TF_neurons, activation='selu'),
+                                                              layers.Dense(1)]),
           'TensorFlow_Softplus_Nadam': keras.Sequential([layers.Dense(TF_neurons, activation='softplus',
                                                                       input_shape=[len(TF_DefaultColumns)]),
                                                          layers.Dense(TF_neurons, activation='softplus'),
@@ -57,12 +57,12 @@ models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=4
                                                     layers.Dense(TF_neurons, activation='elu'),
                                                     layers.Dense(TF_neurons, activation='relu'),
                                                     layers.Dense(1)])}
-TF_models_list = ['TensorFlow_Selu_Adam', 'TensorFlow_Softplus_Nadam', 'TensorFlow_Synthetic']
-TF_optimizers = {'TensorFlow_Selu_Adam': keras.optimizers.Nadam(learning_rate=0.001),
+TF_models_list = ['TensorFlow_Relu_Elu_Selu_Nadam', 'TensorFlow_Softplus_Nadam', 'TensorFlow_Synthetic']
+TF_optimizers = {'TensorFlow_Relu_Elu_Selu_Nadam': keras.optimizers.Nadam(learning_rate=0.001),
                  'TensorFlow_Softplus_Nadam': keras.optimizers.Nadam(learning_rate=0.001),
                  'TensorFlow_Synthetic': keras.optimizers.Adam(learning_rate=0.001)}
 TF_metrics = [tf.keras.metrics.MeanAbsoluteError(name="mae")]
-TF_loss = {'TensorFlow_Selu_Adam': losses.Huber(),
+TF_loss = {'TensorFlow_Relu_Elu_Selu_Nadam': losses.Huber(),
            'TensorFlow_Softplus_Nadam': losses.MeanAbsoluteError(),
            'TensorFlow_Synthetic': losses.MeanAbsoluteError()}
 sklearn_list = ['RandomForest', 'DecisionTree', 'KNeighbors', 'ExtraTrees', 'GradientBoosting', 'MLP',

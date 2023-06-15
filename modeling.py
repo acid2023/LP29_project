@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tensorflow import keras
 import pickle
-from typing import Dict, List, Tuple
+from typing import Dict, List
 import logging
 import modeling_settings as mds
 import folders
@@ -183,10 +183,7 @@ def prediction(df: pd.DataFrame, models: Dict, columns_list: List) -> pd.DataFra
         elif name in mds.TF_models_list:
             update_X = update_trains[mds.TF_DefaultColumns]
         update_Y = model.predict(update_X)
-        logging.info(update_X)
-        logging.info(update_Y)
         logging.info(f'predicting for model {name} finished')
-        logging.debug(update_Y)
         duration = 'duration_' + name
         update_trains[duration] = pd.DataFrame(update_Y)
         expected_delivery = 'expected_delivery_' + name

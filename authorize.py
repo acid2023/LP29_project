@@ -15,7 +15,7 @@ def get_text_body_from_message(message: object) -> str:
     return text
 
 
-def generate_signature(username):
+def generate_signature(username: str) -> bytes:
     username_bytes = username.encode('utf-8')
     master_key = ms.master_key.encode('utf-8')
     sha256_hash = hashlib.sha256(username_bytes)
@@ -24,7 +24,7 @@ def generate_signature(username):
     return signature
 
 
-def get_signature(letter):
+def get_signature(letter: object) -> str:
     pattern = r'signature=[\'"]b\'([\w+/=]+)\'[\'"]'
     message = letter['message']
     letter_text = get_text_body_from_message(message)
@@ -50,13 +50,10 @@ def authorize_user(letter):
         sender = letter['sender']
         return_path = letter['return_path']
         if verify_signature(sender, signature) or verify_signature(return_path, signature):
-            logging.info('User %s authorized' % sender)
             return True
         elif sender == ms.master_mail or return_path == ms.master_mail:
-            logging.info('User %s authorized' % sender)
             return True
         else:
-            logging.info('User %s not authorized' % sender)
             return False
     return False
 

@@ -1,4 +1,4 @@
-from mail import load_xlsx_from_message, get_columns_list_from_message, send_logs, send_xlsx, get_messages, send_message
+from mail import load_xlsx_from_message, get_columns_list_from_message, get_messages, send_letter
 import mail_settings as ms
 from authorize import authorize_user, generate_new_user_signature
 from folders import folder_check
@@ -9,23 +9,38 @@ import pandas as pd
 import modeling as md
 import modeling_settings as mds
 import io
+from bot import TelegramBotHandler
+import telegram
+from telegram.error import TelegramError
 
 
-def start_logging():
+def start_logging(**kwarg) -> str:
+    logging.basicConfig(level=logging.DEBUG)
+    screen = kwarg['screen']
+    bot = kwarg['bot']
     path = folder_check(folders.logs_folder)
     unix_time = int(time.time())
     filename = f'{path}{unix_time}_{ms.log_file}'
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    file_handler = logging.FileHandler(filename)
-    file_handler.setLevel(logging.INFO)
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+    file_handler = logging.FileHandler(filename)
+    file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
-    stream_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
+    if screen:
+        screen_handler = logging.StreamHandler()
+        screen_handler.setLevel(logging.INFO)
+        screen_handler.setFormatter(formatter)
+        logger.addHandler(screen_handler)
+    if bot:
+        try:
+            bot_handler = TelegramBotHandler(bot)
+            bot_handler.setLevel(logging.INFO)
+            bot_handler.setFormatter(formatter)
+            logger.addHandler(bot_handler)
+        except TelegramError as e:
+            logging.ERROR('unable to initiate TelegramBot: %s' % e)
     return filename
 
 
@@ -35,7 +50,7 @@ def df_to_excel(df: pd.DataFrame) -> bytes:
         return buffer.getvalue()
 
 
-def create_models(letter: bytes):
+def create_models(letter: bytes) -> None:
     logging.info('creating models')
     attachment = load_xlsx_from_message(letter['message'])
     logging.info('attachement found')
@@ -44,36 +59,35 @@ def create_models(letter: bytes):
     df = pd.read_excel(xlsx_data)
     df.drop(df[df['update'] >= pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
     logging.info(f'loaded attachment - {xlsx_filename}')
-    columns_list = get_columns_list_from_message(letter)
-    models = md.create_models(df, columns_list)
+    models = md.create_models(df, mds.DefaultColumns)
     logging.info('models created')
     md.save_models(models)
     logging.info('models saved')
     logging.info('no errors found, models saved')
 
 
-def predict_data(letter: bytes):
+def predict_data(letter: bytes) -> None:
     logging.info('predicting data')
     attachment = load_xlsx_from_message(letter['message'])
     logging.info('attachement found')
     xlsx_data = attachment[0]['data']
     df = pd.read_excel(xlsx_data)
     df.drop(df[df['update'] <= pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
-    columns_list = get_columns_list_from_message(letter)
     logging.info('Loading models')
     models = md.load_models()
     logging.info('Models loaded')
-    forecast = md.prediction(df, models, columns_list)
+    forecast = md.prediction(df, models, mds.DefaultColumns)
     logging.info('forecast completed')
     update_trains = df_to_excel(forecast)
     logging.info('updated data on trains compiled')
-    send_xlsx(letter['sender'], 'updated data on trains', update_trains, 'update_trains.xlsx')
+    send_letter(letter['sender'], 'forecasted data', message_type='xlsx', 
+                attachment=update_trains, filename='update_trains_new.xlsx')
     logging.info('updates sent, no error found')
     forecast.to_excel('update_trains.xlsx')
     logging.info('update saved locally')
 
 
-def main():
+def main() -> None:
     emails = get_messages(all_messages=True)
     logging.info(f'recieved {len(emails)} letters')
     archive_list = []
@@ -93,7 +107,8 @@ def main():
             logging.info('new user signature creating')
             signature = generate_new_user_signature(letter)
             logging.info('signature for new user created')
-            send_message(letter['sender'], 'Access to models server', f'signature="{signature}"')
+            text = f'signature="{signature}"'
+            send_letter(letter['sender'], 'Access to models server', message_type='message', message=text)
             logging.info('new user signature sent')
         elif user_athorized and letter['subject'] == ms.creation_subject:
             create_models(letter)
@@ -103,29 +118,22 @@ def main():
 
 
 if __name__ == "__main__":
-    logs_file = start_logging()
+    my_bot = telegram.Bot(token=ms.API_KEY)
+    logs_file = start_logging(bot=my_bot, screen=True)
     logging.info('start')
     try:
         while True:
             main()
             if input('stop: (y/n)') == 'y':
                 break
-    except ValueError as e:
-        logging.info('error found: %', e)
-    except AttributeError as e:
-        logging.info('error found: %', e)
-    except TypeError as e:
-        logging.info('error found: %', e)
-    except KeyError as e:
-        logging.info('error found: %', e)
-    except IndexError as e:
-        logging.info('error found: %', e)
+    except (ValueError, AttributeError, TypeError, KeyError, IndexError) as e:
+        logging.exception('error found: %s', e)
     except Exception as e:
-        logging.info('error found: %', e)
+        logging.exception('unknown error found: %s', e)
     finally:
         try:
-            send_logs(ms.master_mail, logs_file)
+            send_letter(ms.master_mail, 'logs', message_type='logs', filename=logs_file)
             logging.info('logs sent')
         except Exception as e:
-            logging.info('error found: %', e)
+            logging.exception('error found: %s', e)
             logging.info('logs not sent')

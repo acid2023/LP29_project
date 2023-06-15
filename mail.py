@@ -60,8 +60,7 @@ def get_messages(all_messages=False) -> List:
     for message_num in message_nums:
         msg = message_extract(mail, message_num)
         message_id = msg['Message-ID']
-        subject = msg['Subject']
-        subject = decode(subject)
+        subject = decode(msg['Subject'])
         logging.info(f'Message {i}, subject - {subject}')
         sender = re.search(email_pattern, msg['From']).group(1)
         msg_date = msg['Date']
@@ -116,18 +115,51 @@ def get_text_body_from_message(message) -> str:
 def get_columns_list_from_message(letter) -> List:
     default_columns = mds.DefaultColumns
     message = letter['message']
-    letter_test = get_text_body_from_message(message)
-    pattern = r'list of columns: \[(.*?)\]'
-    match = re.search(pattern, letter_test)
+    letter_text = get_text_body_from_message(message)
+    pattern = r'\[(.*?)\]'
+    match = re.search(pattern, letter_text)
     if match:
         column_str = match.group(1)
-        columns = [col.strip() for col in column_str.split(',')]
+        columns = [col.replace("’", "'").replace("‘", "'").strip("\"'") for col in column_str.split(',')]
         return columns
     else:
         return default_columns
 
 
-def send_attachment(receiver_address: str, subject: str, attachment: object):
+def send_letter(receiver_address: str, subject: str, **kwargs) -> None:
+    mail = stmp_login()
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = ms.username
+    msg['To'] = receiver_address
+    message_type = kwargs.get('message_type')
+    attachment_data = kwargs.get('attachment')
+    filename = kwargs.get('filename')
+    message = kwargs.get('message')
+    if message_type == 'xlsx':
+        if not attachment_data:
+            raise ValueError('data is empty')
+        attachment = MIMEApplication(attachment_data, _subtype='xlsx')
+        attachment['Content-Disposition'] = f'attachment; filename="{filename}"'
+        msg.attach(attachment)
+    elif message_type == 'logs':
+        if not filename:
+            raise ValueError('no filename for logs')
+        with open(filename, 'rb') as file:
+            session_log = file.read()
+        attachment = MIMEApplication(session_log, _subtype='plain')
+        attachment['Content-Disposition'] = f'attachment; filename="{filename}"'
+        msg.attach(attachment)
+    elif message_type == 'message':
+        if not message:
+            raise ValueError('message is empty')
+        msg.attach(MIMEText(message, 'plain'))
+    else:
+        raise ValueError('invalid message_type')
+    mail.sendmail(ms.username, receiver_address, msg.as_bytes())
+
+
+def send_attachment(receiver_address, subject, attachment):
     mail = stmp_login()
     my_address = ms.username
     msg = MIMEMultipart()
@@ -138,13 +170,14 @@ def send_attachment(receiver_address: str, subject: str, attachment: object):
     mail.sendmail(my_address, receiver_address, msg.as_bytes())
 
 
-def send_xlsx(receiver_address: str, subject: str, data: object, filename: str):
+def send_xlsx(receiver_address, subject, data, filename):
     attachment = MIMEApplication(data, _subtype='xlsx')
     attachment['Content-Disposition'] = f'attachment; filename="{filename}"'
     send_attachment(receiver_address, subject, attachment)
 
 
-def send_logs(receiver_address: str, logs_file: object):
+def send_logs(receiver_address):
+    logs_file = ms.log_file
     with open(logs_file, 'rb') as file:
         session_log = file.read()
     attachment = MIMEApplication(session_log, _subtype='plain')
@@ -152,7 +185,7 @@ def send_logs(receiver_address: str, logs_file: object):
     send_attachment(receiver_address, 'Logs', attachment)
 
 
-def send_message(receiver_address: str, subject: str, message: str):
+def send_message(receiver_address, subject, message):
     mail = stmp_login()
     my_address = ms.username
     msg = MIMEMultipart()
