@@ -56,12 +56,11 @@ def get_messages(all_messages=False) -> List:
     search_querry = 'ALL' if all_messages else 'UNSEEN'
     _, data = mail.search(None, search_querry)
     message_nums = data[0].split()
-    i = 0
-    for message_num in message_nums:
+    for num, message_num in enumerate(message_nums):
         msg = message_extract(mail, message_num)
         message_id = msg['Message-ID']
         subject = decode(msg['Subject'])
-        logging.info(f'Message {i}, subject - {subject}')
+        logging.info(f'Message {num}, subject - {subject}')
         sender = re.search(email_pattern, msg['From']).group(1)
         msg_date = msg['Date']
         return_path = msg['Return-path']
@@ -69,7 +68,6 @@ def get_messages(all_messages=False) -> List:
                             'message': msg,
                             'subject': subject, 'date': msg_date,
                             'sender': sender, 'return_path': return_path})
-        i += 1
     return emails_list
 
 
