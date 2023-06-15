@@ -3,9 +3,10 @@ import hmac
 import base64
 import mail_settings as ms
 import re
+import logging
 
 
-def get_text_body_from_message(message):
+def get_text_body_from_message(message: object) -> str:
     text_parts = []
     for part in message.walk():
         if part.get_content_type() == 'text/plain':
@@ -14,17 +15,17 @@ def get_text_body_from_message(message):
     return text
 
 
-def generate_signature(username):
+def generate_signature(username: str) -> bytes:
     username_bytes = username.encode('utf-8')
-    master_key = ms.master_mail.encode('utf-8')
+    master_key = ms.master_key.encode('utf-8')
     sha256_hash = hashlib.sha256(username_bytes)
     hmac_hash = hmac.new(master_key, sha256_hash.digest(), 'MD5')
     signature = base64.b64encode(hmac_hash.digest())
     return signature
 
 
-def get_signature(letter):
-    pattern = r'signature="b\'([\w+/=]+)\'"'
+def get_signature(letter: object) -> str:
+    pattern = r'signature=[\'"]b\'([\w+/=]+)\'[\'"]'
     message = letter['message']
     letter_text = get_text_body_from_message(message)
     match = re.search(pattern, letter_text)
@@ -50,20 +51,25 @@ def authorize_user(letter):
         return_path = letter['return_path']
         if verify_signature(sender, signature) or verify_signature(return_path, signature):
             return True
+        elif sender == ms.master_mail or return_path == ms.master_mail:
+            return True
         else:
             return False
     return False
 
 
-def create_new_user(letter):
+def generate_new_user_signature(letter):
     pattern = r'new_user\s*=\s*[«"](.*?)[»"]'
     message = letter['message']
     letter_text = get_text_body_from_message(message)
     match = re.search(pattern, letter_text)
     if match:
         email_address = match.group(1)
-        return generate_signature(email_address)
+        signature = generate_signature(email_address)
+        logging.info('sugnature generated')
+        return signature
     else:
+        logging.info('signature was not generated')
         return None
 
 
