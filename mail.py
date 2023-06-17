@@ -71,7 +71,7 @@ def get_messages(all_messages=False) -> List:
     return emails_list
 
 
-def archiveing_and_removing_messages(archive_list: List):
+def archiveing_and_removing_messages(archive_list: List) -> None:
     logging.info("archieving and removing  messages")
     mail = imap_login()
     _, data = mail.search(None, 'ALL')
@@ -101,7 +101,7 @@ def load_xlsx_from_message(message: bytes) -> Dict:
     return xlsx_files
 
 
-def get_text_body_from_message(message) -> str:
+def get_text_body_from_message(message: email.message.Message) -> str:
     text_parts = []
     for part in message.walk():
         if part.get_content_type() == 'text/plain':
@@ -110,7 +110,7 @@ def get_text_body_from_message(message) -> str:
     return text
 
 
-def get_columns_list_from_message(letter) -> List:
+def get_columns_list_from_message(letter: email.message.Message) -> List:
     default_columns = mds.DefaultColumns
     message = letter['message']
     letter_text = get_text_body_from_message(message)

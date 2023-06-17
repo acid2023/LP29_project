@@ -5,12 +5,12 @@ import mail_settings as ms
 
 
 class TelegramBotHandler(logging.Handler):
-    def __init__(self, bot: telegram.Bot):
+    def __init__(self, bot: telegram.Bot) -> None:
         super().__init__()
         self.bot = bot
         self.chat_id = ms.my_chat
 
-    def emit(self, record):
+    def emit(self, record: str) -> None:
         try:
             message = self.format(record)
             self.bot.send_message(chat_id=self.chat_id, text=message)

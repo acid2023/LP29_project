@@ -4,15 +4,19 @@ import base64
 import mail_settings as ms
 import re
 import logging
+from mail import get_text_body_from_message
+import email
 
 
-def get_text_body_from_message(message: object) -> str:
+'''
+def get_text_body_from_message(message: email.message.Message) -> str:
     text_parts = []
     for part in message.walk():
         if part.get_content_type() == 'text/plain':
             text_parts.append(part.get_payload(decode=True).decode('utf-8'))
     text = '\n'.join(text_parts)
     return text
+'''
 
 
 def generate_signature(username: str) -> bytes:
@@ -24,7 +28,7 @@ def generate_signature(username: str) -> bytes:
     return signature
 
 
-def get_signature(letter: object) -> str:
+def get_signature(letter: object) -> bytes:
     pattern = r'signature=[\'"]b\'([\w+/=]+)\'[\'"]'
     message = letter['message']
     letter_text = get_text_body_from_message(message)
@@ -36,7 +40,7 @@ def get_signature(letter: object) -> str:
         return None
 
 
-def verify_signature(username, signature):
+def verify_signature(username: str, signature: bytes) -> bool:
     expected_signature = generate_signature(username)
     if expected_signature is not None:
         return hmac.compare_digest(signature, expected_signature)
@@ -44,7 +48,7 @@ def verify_signature(username, signature):
         return False
 
 
-def authorize_user(letter):
+def authorize_user(letter: email.message.Message) -> bool:
     signature = get_signature(letter)
     if signature is not None:
         sender = letter['sender']
@@ -58,7 +62,7 @@ def authorize_user(letter):
     return False
 
 
-def generate_new_user_signature(letter):
+def generate_new_user_signature(letter: email.message.Message) -> bytes|None:
     pattern = r'new_user\s*=\s*[«"](.*?)[»"]'
     message = letter['message']
     letter_text = get_text_body_from_message(message)

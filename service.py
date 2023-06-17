@@ -1,4 +1,4 @@
-from mail import load_xlsx_from_message, get_columns_list_from_message, get_messages, send_letter
+from mail import load_xlsx_from_message, get_messages, send_letter
 import mail_settings as ms
 from authorize import authorize_user, generate_new_user_signature
 from folders import folder_check
@@ -14,25 +14,27 @@ import telegram
 from telegram.error import TelegramError
 
 
+
 def start_logging(**kwarg) -> str:
     logging.basicConfig(level=logging.DEBUG)
-    screen = kwarg['screen']
-    bot = kwarg['bot']
+    screen = kwarg.get('screen', None)
+    bot = kwarg.get('bot', None)
     path = folder_check(folders.logs_folder)
     unix_time = int(time.time())
     filename = f'{path}{unix_time}_{ms.log_file}'
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s %(levelname)s - Line No:%(lineno)d - %(message)s')
     file_handler = logging.FileHandler(filename)
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
     if screen:
-        screen_handler = logging.StreamHandler()
-        screen_handler.setLevel(logging.INFO)
-        screen_handler.setFormatter(formatter)
-        logger.addHandler(screen_handler)
+        if not any(isinstance(handler, logging.StreamHandler) for handler in logger.handlers):
+            screen_handler = logging.StreamHandler()
+            screen_handler.setLevel(logging.INFO)
+            screen_handler.setFormatter(formatter)
+            logger.addHandler(screen_handler)
     if bot:
         try:
             bot_handler = TelegramBotHandler(bot)
@@ -57,11 +59,10 @@ def create_models(letter: bytes) -> None:
     xlsx_data = attachment[0]['data']
     xlsx_filename = attachment[0]['filename']
     df = pd.read_excel(xlsx_data)
-    df.drop(df[df['update'] >= pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
     logging.info(f'loaded attachment - {xlsx_filename}')
-    models = md.create_models(df, mds.DefaultColumns)
+    created_models_dict = md.create_models(df, mds.DefaultColumns)
     logging.info('models created')
-    md.save_models(models)
+    md.save_models(created_models_dict)
     logging.info('models saved')
     logging.info('no errors found, models saved')
 
@@ -72,15 +73,14 @@ def predict_data(letter: bytes) -> None:
     logging.info('attachement found')
     xlsx_data = attachment[0]['data']
     df = pd.read_excel(xlsx_data)
-    df.drop(df[df['update'] <= pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
     logging.info('Loading models')
-    models = md.load_models()
+    models_dict = md.load_models()
     logging.info('Models loaded')
-    forecast = md.prediction(df, models, mds.DefaultColumns)
+    forecast = md.prediction(df, models_dict)
     logging.info('forecast completed')
     update_trains = df_to_excel(forecast)
     logging.info('updated data on trains compiled')
-    send_letter(letter['sender'], 'forecasted data', message_type='xlsx', 
+    send_letter(letter['sender'], 'forecasted data', message_type='xlsx',
                 attachment=update_trains, filename='update_trains_new.xlsx')
     logging.info('updates sent, no error found')
     forecast.to_excel('update_trains.xlsx')
@@ -118,8 +118,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    my_bot = telegram.Bot(token=ms.API_KEY)
-    logs_file = start_logging(bot=my_bot, screen=True)
+    # my_bot = telegram.Bot(token=ms.API_KEY)
+    logs_file = start_logging(screen=True)
     logging.info('start')
     try:
         while True:
