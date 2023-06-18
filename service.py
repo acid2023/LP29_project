@@ -14,7 +14,6 @@ import telegram
 from telegram.error import TelegramError
 
 
-
 def start_logging(**kwarg) -> str:
     logging.basicConfig(level=logging.DEBUG)
     screen = kwarg.get('screen', None)
@@ -118,7 +117,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # my_bot = telegram.Bot(token=ms.API_KEY)
+    my_bot = telegram.Bot(token=ms.API_KEY)
     logs_file = start_logging(screen=True)
     logging.info('start')
     try:
