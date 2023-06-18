@@ -38,8 +38,8 @@ def fetch_coordinates(station: str) -> list:
                     return coords
                 else:
                     logging.info('problems parsing geodata')
-            except:
-                pass
+            except Exception as e:
+                logging.exception('problems %s', e)
                 return [None, None]
         except Exception as e:
             logging.exception('problems %s', e)

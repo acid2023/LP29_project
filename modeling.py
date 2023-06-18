@@ -7,10 +7,10 @@ import tensorflow as tf
 import pickle
 from typing import Dict, List
 import logging
-import modeling_setting_2 as mds
+import modeling_settings as mds
 import folders
 from folders import folder_check
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder
 import osm
 import numpy as np
 
@@ -21,7 +21,7 @@ def save_models(models_dict: Dict) -> None:
     sklearn_models = {}
     models_list = []
     for model_name, model in models_dict['fit_models'].items():
-        if model_name in mds.TF_models_list:
+        if model_name.startswith('TensoFlow'):
             models_list.append(model_name)
             ts_filename = f'{path}{model_name}.h5'
             model.save(ts_filename)
@@ -117,10 +117,6 @@ def cross_validation_test(models: Dict, metrics_data: List) -> pd.DataFrame:
     scores = {}
     for name, model in models.items():
         X_test, y_test = metrics_data[name]
-       # if name in mds.TF_models_list:
-       #     logging.info('TensorFlow models, no scoring')
-       #     scores[name] = [0, 0]
-       # elif name in mds.sklearn_list:
         logging.info(f'SKLearn model, scoring for model {name} started')
         cross_scores = cross_val_score(estimator=model, X=X_test, y=y_test, cv=num_folds, scoring=scoring_metric)
         scores[name] = [-cross_scores.mean(), cross_scores.std()]
@@ -130,7 +126,7 @@ def cross_validation_test(models: Dict, metrics_data: List) -> pd.DataFrame:
     return scores
 
 
-def get_models_metrics(models: Dict, metrics_data: Dict) -> pd.DataFrame:
+def get_models_metrics(models: Dict, metrics_data: Dict, TF_models: List) -> pd.DataFrame:
     models_metrics = {}
     for name, model in models.items():
         X_test = metrics_data[name][0]
@@ -166,7 +162,7 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
     metrics_data = {}
     columns = {}
     keras_columns_list = columns_list = mds.DefaultColumns + one_hot_encoded_columns
-    models = mds.declare_keras_models(mds.models, len(keras_columns_list))
+    models = mds.declare_keras_models({}, len(keras_columns_list))
     TF_models_list = [model for model in models if model.startswith('TensorFlow')]
     for name, model in models.items():
         logging.info(f'fitting model {name} started')
@@ -177,31 +173,19 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
         X = encoded_roads[columns_list]
         columns[name] = columns_list
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-#        if name in TF_models_list:
-#            X_train = tf.convert_to_tensor(X_train, dtype=tf.float32)
-#            y_train = tf.convert_to_tensor(y_train, dtype=tf.float32)
-#            X_test = tf.convert_to_tensor(X_test, dtype=tf.float32)
- #           y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
         fit_models[name] = model.fit(X_train, y_train)
-  #      if name in TF_models_list:
-   #         fit_models[name] = model.model
-   #     logging.info(X_test)
-    #    logging.info(type(X_test))
-       # X_test = tf.convert_to_tensor(X_test, dtype=tf.float32)      
-    #    logging.info(X_test)
-    #    logging.info(type(X_test))
         metrics_data[name] = [X_test, y_test]
         logging.info(f'fitting model {name} finished')
     logging.info('All models fitted')
     logging.info('Calculating metrics')
-    metrics = get_models_metrics(fit_models, metrics_data)
+    metrics = get_models_metrics(fit_models, metrics_data, TF_models_list)
     logging.info('Metrics calculated')
-    logging.info(f"Metrics: \n{metrics.to_markdown()}")
+    logging.info(f"Metrics: \n{metrics}")
     logging.info('Calculating scores')
     scores = {}
     # cross_validation_test(fit_models, metrics_data)
     logging.info('Scores calculated')
-    logging.info(f"Scores: \n{scores.to_markdown()}")
+    logging.info(f"Scores: \n{scores}")
     return {'fit_models': fit_models,
             'encoders': {'road_encoder': road_encoder},
             'scalers': scalers, 'metrics': metrics, 'scores': scores, 'columns': columns}
@@ -209,7 +193,6 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
 
 def preprocessing_update_trains(df: pd.DataFrame) -> pd.DataFrame:
     df = df.replace({'': np.nan, 'NA': np.nan, 'None': np.nan})
-   # df.dropna(inplace=True)
     df['DLeft'] = df['расстояние до Лены'].astype(int)
 
     logging.info('starting coding stations')
