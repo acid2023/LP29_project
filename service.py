@@ -1,21 +1,25 @@
-from mail import load_xlsx_from_message, get_messages, send_letter
+import pandas as pd
+
+import telegram
+from telegram.error import TelegramError
+
+import io
+import sys
+import time
+import logging
+import email
+
+from mail import get_data_from_message, get_messages, send_letter
 import mail_settings as ms
 from authorize import authorize_user, generate_new_user_signature
 from folders import folder_check
 import folders
-import time
-import logging
-import pandas as pd
 import modeling as md
 import modeling_settings as mds
-import io
-import sys
 from bot import TelegramBotHandler
-import telegram
-from telegram.error import TelegramError
 
 
-def start_logging(**kwarg) -> str:
+def start_logging(**kwarg: str | TelegramBotHandler) -> str:
     logging.basicConfig(level=logging.DEBUG)
     screen = kwarg.get('screen', None)
     bot = kwarg.get('bot', None)
@@ -52,12 +56,12 @@ def df_to_excel(df: pd.DataFrame) -> bytes:
         return buffer.getvalue()
 
 
-def create_models(**kwargs) -> None:
+def create_models(**kwargs: str | email.Message) -> None:
     logging.info('creating models')
     letter = kwargs.get('letter', False)
     local = kwargs.get('local', False)
     if letter:
-        attachment = load_xlsx_from_message(letter['message'])
+        attachment = get_data_from_message(letter['message'], get_type='xlsx')
         logging.info('attachement found')
         xlsx_data = attachment[0]['data']
         xlsx_filename = attachment[0]['filename']
@@ -76,12 +80,12 @@ def create_models(**kwargs) -> None:
     logging.info('no errors found, models saved')
 
 
-def predict_data(**kwargs) -> None:
+def predict_data(**kwargs: str | email.Message) -> None:
     letter = kwargs.get('letter', False)
     local = kwargs.get('local', False)
     logging.info('predicting data')
     if letter:
-        attachment = load_xlsx_from_message(letter['message'])
+        attachment = get_data_from_message(letter['message'], get_type='xlsx')
         logging.info('attachement found')
         xlsx_data = attachment[0]['data']
         df = pd.read_excel(xlsx_data)

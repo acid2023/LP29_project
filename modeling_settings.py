@@ -1,23 +1,25 @@
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor, AdaBoostRegressor
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import ExtraTreesRegressor, AdaBoostRegressor
-from sklearn.neural_network import MLPRegressor
-from tensorflow import keras
-import tensorflow as tf
-from tensorflow.keras import layers
 from sklearn.linear_model import Ridge, Lasso, ElasticNet, Lars, LassoLars, OrthogonalMatchingPursuit
-from sklearn.linear_model import BayesianRidge, ARDRegression, LogisticRegression, SGDRegressor
-from sklearn.linear_model import PassiveAggressiveRegressor, HuberRegressor, RANSACRegressor
-from keras.wrappers.scikit_learn import KerasRegressor, BaseWrapper
+from sklearn.linear_model import BayesianRidge, ARDRegression, PassiveAggressiveRegressor, RANSACRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.base import BaseEstimator, RegressorMixin
-import numpy as np
-import logging
-#from typing import dict
 
+from tensorflow import keras
+from keras import layers
+from keras.wrappers.scikit_learn import KerasRegressor
+
+import pandas as pd
+
+from typing import Dict
+
+DefaultTrainingDateCut = '2023-05-15'
+filter_types = ['savgol', 'butter', 'none']
+filter_type = filter_types[1]
 
 DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'in_train', 'start_lat', 'start_lon']
+
 TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', ]
 TF_number_of_epochs = 200
 TF_batch_size = 32
@@ -27,28 +29,17 @@ TF_input_shape = (None, )
 
 
 class CustomKerasRegressor(KerasRegressor, BaseEstimator, RegressorMixin):
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-            self.model_ = None
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.model_ = None
 
-        def fit(self, X, y, **kwargs):
-            if not tf.is_tensor(X):
-                X = tf.convert_to_tensor(X, dtype=tf.float32)
-            if not tf.is_tensor(y):
-                y = tf.convert_to_tensor(y, dtype=tf.float32)
-            history = super().fit(X, y, **kwargs)
-            self.model_ = history.model  # store the trained model in the instance variable
-            return self.model_
-        
-        def save_model(self, filepath):
-            self.model_.save(filepath)
-        
-   #     def predict(self, X):
-   #         if not isinstance(X, (tf.Tensor, tf.compat.v1.Tensor, tf.python.framework.ops.EagerTensor)):
-    #            X = tf.convert_to_tensor(X, dtype=tf.float32) 
-     #       return self.model_.predict(X)
+    def fit(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> keras.Sequential:
+        history = super().fit(X, y, **kwargs)
+        self.model_ = history.model
+        return self.model_
 
-def declare_keras_models(models_dict: dict, num_features: int) -> dict:
+
+def declare_keras_models(models_dict: Dict[str, object], num_features: int) -> Dict[str, object]:
     def TensorFlow_Relu_Elu_Selu_Nadam() -> keras.Sequential:
         model = keras.Sequential([layers.Dense(TF_neurons, activation='relu', input_shape=(None, num_features)),
                                   layers.Dense(TF_neurons, activation='elu'),
@@ -78,18 +69,21 @@ def declare_keras_models(models_dict: dict, num_features: int) -> dict:
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
-    keras_models = {'TensorFlow_Relu_Elu_Selu_Nadam':
-                    CustomKerasRegressor(build_fn=TensorFlow_Relu_Elu_Selu_Nadam, batch_size=TF_batch_size,
-                                   epochs=TF_number_of_epochs),
-                    'TensorFlow_Softplus_Nadam':
-                    CustomKerasRegressor(build_fn=TensorFlow_Softplus_Nadam, batch_size=TF_batch_size,
-                                   epochs=TF_number_of_epochs),
-                    'TensorFlow_Synthetic':
-                    CustomKerasRegressor(build_fn=TensorFlow_Synthetic, batch_size=TF_batch_size,
-                                   epochs=TF_number_of_epochs)
+    keras_models = {
+        'TensorFlow_Relu_Elu_Selu_Nadam':
+        CustomKerasRegressor(build_fn=TensorFlow_Relu_Elu_Selu_Nadam, batch_size=TF_batch_size,
+                             epochs=TF_number_of_epochs),
+        'TensorFlow_Softplus_Nadam':
+        CustomKerasRegressor(build_fn=TensorFlow_Softplus_Nadam, batch_size=TF_batch_size,
+                             epochs=TF_number_of_epochs),
+        'TensorFlow_Synthetic':
+        CustomKerasRegressor(build_fn=TensorFlow_Synthetic, batch_size=TF_batch_size,
+                             epochs=TF_number_of_epochs)
          }
+
     for model in keras_models:
         models_dict[model] = keras_models[model]
+
     return models_dict
 
 
@@ -106,24 +100,11 @@ models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=4
           'OrthogonalMatchingPursuit': OrthogonalMatchingPursuit(),
           'BayesianRidge': BayesianRidge(),
           'ARDRegression': ARDRegression(),
-          # 'LogisticRegression': LogisticRegression(),
-          # 'SGDRegressor': SGDRegressor(),
           'PassiveAggressiveRegressor': PassiveAggressiveRegressor(),
-          #'HuberRegressor': HuberRegressor(),
           'RANSACRegressor': RANSACRegressor(),
           'ElasticNet': ElasticNet(),
           'LassoLars': LassoLars(),
           'AdaBoost': AdaBoostRegressor(random_state=42, n_estimators=300)}
 
-# TF_models_list = [model for model in models if model.startswith('TensorFlow')]
 
-sklearn_list = ['RandomForest', 'DecisionTree', 'KNeighbors', 'ExtraTrees', 'GradientBoosting', 'MLP',
-                'GaussianProcess_RBF', 'GaussianProcess_Matern', 'GaussianProcess_RQ', 'GaussianProcess_Exp',
-                'SVR_linear', 'SVR_poly', 'SVR_rbf', 'SVR_sigmoid', 'AdaBoost', 'Ridge', 'Lasso', 'ElasticNet',
-                'Lars', 'LassoLars', 'OrthogonalMatchingPursuit', 'BayesianRidge', 'ARDRegression',
-                'LogisticRegression', 'SGDRegressor', 'PassiveAggressiveRegressor', 'HuberRegressor',
-                'RANSACRegressor']
-
-DefaultTrainingDateCut = '2023-05-15'
-filter_types = ['savgol', 'butter', 'none']
-filter_type = filter_types[1]
+sklearn_list = list(models.keys())

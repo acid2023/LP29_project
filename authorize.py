@@ -4,7 +4,7 @@ import base64
 import mail_settings as ms
 import re
 import logging
-from mail import get_text_body_from_message
+from mail import get_data_from_message
 import email
 
 
@@ -31,7 +31,7 @@ def generate_signature(username: str) -> bytes:
 def get_signature(letter: object) -> bytes:
     pattern = r'signature=[\'"]b\'([\w+/=]+)\'[\'"]'
     message = letter['message']
-    letter_text = get_text_body_from_message(message)
+    letter_text = get_data_from_message(message, get_type='text')
     match = re.search(pattern, letter_text)
     if match:
         signature = match.group(1).strip()
@@ -62,10 +62,10 @@ def authorize_user(letter: email.message.Message) -> bool:
     return False
 
 
-def generate_new_user_signature(letter: email.message.Message) -> bytes|None:
+def generate_new_user_signature(letter: email.message.Message) -> bytes | None:
     pattern = r'new_user\s*=\s*[«"](.*?)[»"]'
     message = letter['message']
-    letter_text = get_text_body_from_message(message)
+    letter_text = get_data_from_message(message, get_type='text')
     match = re.search(pattern, letter_text)
     if match:
         email_address = match.group(1)

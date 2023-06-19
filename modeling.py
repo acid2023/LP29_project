@@ -1,25 +1,33 @@
 import pandas as pd
+import numpy as np
+
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
 from scipy.signal import savgol_filter, filtfilt, butter
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from tensorflow import keras
+
+import keras
 import tensorflow as tf
+
 import pickle
-from typing import Dict, List
 import logging
+from typing import Dict, List, Union, Tuple
+
 import modeling_settings as mds
 import folders
 from folders import folder_check
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
 import osm
-import numpy as np
 
 
-#def save_keras(model) -> None:
-
-
-
-def save_models(models_dict: Dict) -> None:
+def save_models(
+    models_dict: Dict[str, Union[
+        Dict[str, object],
+        Dict[str, Dict[str, OneHotEncoder]],
+        Dict[str, StandardScaler],
+        Dict[str, Tuple[float, float]],
+        Dict[str, float], Dict[str, pd.DataFrame],
+        Dict[str, List[str]]]]) -> None:
     path = folder_check(folders.models_folder)
     model_filename = f'{path}models_sklearn.pkl'
     sklearn_models = {}
@@ -30,7 +38,6 @@ def save_models(models_dict: Dict) -> None:
             sklearn_models[model_name] = model
             sklearn_list.append(model_name)
         else:
-            #keras.models.save_model(model.model_, f'{path}{model_name}.h5')
             model.save(f'{path}{model_name}.h5')
             TF_models_list.append(model_name)
     with open(model_filename, 'wb') as file:
@@ -51,18 +58,17 @@ def save_models(models_dict: Dict) -> None:
         pickle.dump(models_dict['encoders'], file)
 
 
-def load_models() -> Dict:
+def load_models() -> Dict[str, Union[Dict[str, object], Dict[str, StandardScaler],
+                                     Dict[str, OneHotEncoder], Dict[str, List[str]]]]:
     path = folder_check(folders.models_folder)
     model_filename = f'{path}models_sklearn.pkl'
     with open(f'{path}columns.pkl', 'rb') as file:
         columns = pickle.load(file)
     with open(model_filename, 'rb') as file:
         models = pickle.load(file)
-    with open(f'{path}sklearn_list.pkl', 'rb') as file:
-        models_list = pickle.load(file)
     with open(f'{path}TF_models_list.pkl', 'rb') as file:
         TF_models_list = pickle.load(file)
-    for model_name in TF_models_list:  
+    for model_name in TF_models_list:
         models[model_name] = keras.models.load_model(f'{path}{model_name}.h5')
     scalers = pickle.load(open(f'{path}scalers.pkl', 'rb'))
     encoders = pickle.load(open(f'{path}encoders.pkl', 'rb'))
@@ -72,6 +78,7 @@ def load_models() -> Dict:
 def preprocessing_trains(df: pd.DataFrame) -> pd.DataFrame:
     df.dropna(subset=['ops station', 'o_road', 'to_home'], inplace=True)
     df.reset_index(drop=True)
+
     logging.info('starting coding stations')
     df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
     df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
@@ -120,26 +127,37 @@ def smooth_data(data: pd.DataFrame, filter_type: str = 'none') -> pd.DataFrame:
     return smooth_data
 
 
-def cross_validation_test(models: Dict, metrics_data: List) -> pd.DataFrame:
-    scoring_metric = 'neg_mean_squared_error'
+def cross_validation_test(models: Dict[str, object],
+                          metrics_data: Dict[str, Union[Tuple[pd.DataFrame, pd.Series], Tuple[tf.Tensor, tf.Tensor]]]
+                          ) -> pd.Dataframe:
+    def cross_validate(
+            model: object, X: Union[pd.DataFrame, tf.Tensor], y: Union[pd.Series, tf.Tensor],
+            n_splits: int = 5
+            ) -> float:
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+        scores = []
+        for train_index, test_index in kf.split(X):
+            X_test, y_test = X[test_index], y[test_index]
+            y_pred = model.predict(X_test)
+            score = r2_score(y_test, y_pred)
+            scores.append(score)
+        return np.mean(scores)
+
     num_folds = 5
     scores = {}
     for name, model in models.items():
         X_test, y_test = metrics_data[name]
-       # if name in mds.TF_models_list:
-       #     logging.info('TensorFlow models, no scoring')
-       #     scores[name] = [0, 0]
-       # elif name in mds.sklearn_list:
         logging.info(f'SKLearn model, scoring for model {name} started')
-        cross_scores = cross_val_score(estimator=model, X=X_test, y=y_test, cv=num_folds, scoring=scoring_metric)
-        scores[name] = [-cross_scores.mean(), cross_scores.std()]
+        scores[name] = cross_validate(model, X_test, y_test, n_splits=num_folds)
         logging.info(f'scoring for model {name} finished')
     scores = pd.DataFrame(scores)
     scores.index = ['Mean', 'Std']
     return scores
 
 
-def get_models_metrics(models: Dict, metrics_data: Dict) -> pd.DataFrame:
+def get_models_metrics(models: Dict[str, object],
+                       metrics_data: Dict[str, Union[Tuple[pd.DataFrame, pd.Series], Tuple[tf.Tensor, tf.Tensor]]]
+                       ) -> pd.DataFrame:
     models_metrics = {}
     for name, model in models.items():
         X_test = metrics_data[name][0]
@@ -156,7 +174,12 @@ def get_models_metrics(models: Dict, metrics_data: Dict) -> pd.DataFrame:
     return metrics
 
 
-def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
+def create_models(
+        df: pd.DataFrame, columns_list: List[str]
+        ) -> Dict[str, Union[Dict[str, object],
+                             Dict[str, Dict[str, OneHotEncoder]],
+                             Dict[str, StandardScaler], Dict[str, Tuple[float, float]],
+                             Dict[str, float], Dict[str, pd.DataFrame], Dict[str, List[str]]]]:
     logging.info('Started preprocessing')
     trains = preprocessing_trains(df)
     logging.info('Preprocessing done')
@@ -174,9 +197,11 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
     scalers = {}
     metrics_data = {}
     columns = {}
+
     keras_columns_list = columns_list = mds.DefaultColumns + one_hot_encoded_columns
     models = mds.declare_keras_models(mds.models, len(keras_columns_list))
     TF_models_list = [model for model in models if model.startswith('TensorFlow')]
+
     for name, model in models.items():
         logging.info(f'fitting model {name} started')
         if name in TF_models_list:
@@ -192,25 +217,17 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
             X_test = tf.convert_to_tensor(X_test, dtype=tf.float32)
             y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
         fit_models[name] = model.fit(X_train, y_train)
-  #      if name in TF_models_list:
-   #         fit_models[name] = model.model
-   #     logging.info(X_test)
-    #    logging.info(type(X_test))
-       # X_test = tf.convert_to_tensor(X_test, dtype=tf.float32)      
-    #    logging.info(X_test)
-    #    logging.info(type(X_test))
         metrics_data[name] = [X_test, y_test]
         logging.info(f'fitting model {name} finished')
     logging.info('All models fitted')
+
     logging.info('Calculating metrics')
     metrics = get_models_metrics(fit_models, metrics_data)
     logging.info('Metrics calculated')
     logging.info(f"Metrics: \n{metrics}")
-    # logging.info('Calculating scores')
+
     scores = {}
-    # cross_validation_test(fit_models, metrics_data)
-    # logging.info('Scores calculated')
-    # logging.info(f"Scores: \n{scores}")
+
     return {'fit_models': fit_models,
             'encoders': {'road_encoder': road_encoder},
             'scalers': scalers, 'metrics': metrics, 'scores': scores, 'columns': columns}
@@ -218,7 +235,7 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
 
 def preprocessing_update_trains(df: pd.DataFrame) -> pd.DataFrame:
     df = df.replace({'': np.nan, 'NA': np.nan, 'None': np.nan})
-   # df.dropna(inplace=True)
+    # df.dropna(inplace=True)
     df['DLeft'] = df['расстояние до Лены'].astype(int)
 
     logging.info('starting coding stations')
@@ -236,7 +253,11 @@ def preprocessing_update_trains(df: pd.DataFrame) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
-def prediction(df: pd.DataFrame, models_dict: Dict) -> pd.DataFrame:
+def prediction(df: pd.DataFrame,
+               models_dict: Dict[str, Union[
+                   Dict[str, object], Dict[str, StandardScaler],
+                   Dict[str, OneHotEncoder], Dict[str, List[str]]
+                ]]) -> pd.DataFrame:
     logging.info('Started preprocessing')
     preprocessed_df = preprocessing_update_trains(df)
     road_encoder = models_dict['encoders']['road_encoder']

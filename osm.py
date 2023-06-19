@@ -2,44 +2,52 @@ import re
 import requests
 import logging
 import pickle
+from typing import List
+
 import folders
 
 coordinates_filename = "coordinates_dict.pkl"
 station_coords = {}
 
 
-def fetch_coordinates(station: str) -> list:
+def fetch_coordinates(station: str) -> List[float, float]:
     global station_coords
+    url = 'https://nominatim.openstreetmap.org/search?'
+    pattern = r'\([^)]*\)'
+
     if not isinstance(station, str):
         station = str(station)
+
     if station in station_coords:
-        # logging.info(f'coordinates for {station} found in dictionary')
         return station_coords[station]
+
     else:
         try:
-            url = 'https://nominatim.openstreetmap.org/search?'
-            pattern = r'\([^)]*\)'
             location = re.sub(pattern, "", station).strip()
             params = {'q': location, 'format': 'json'}
             response = requests.get(f"{url}{'&'.join([f'{k}={v}' for k, v in params.items()])}")
             results = response.json()
+
             location_2 = 'железнодорожная станция ' + location
             params_2 = {'q': location_2, 'format': 'json'}
             response_2 = requests.get(f"{url}{'&'.join([f'{k}={v}' for k, v in params_2.items()])}")
             results_2 = response_2.json()
+
             try:
                 coords = [results[0]['lat'], results[0]['lon']]
                 coords_2 = [results_2[0]['lat'], results_2[0]['lon']]
+
                 if coords_2 != [None, None]:
                     coords = coords_2
+
                 if coords:
                     logging.info(f'coordinates for {station} found')
                     station_coords[station] = coords
                     return coords
                 else:
                     logging.info('problems parsing geodata')
-            except:
-                pass
+            except Exception as e:
+                logging.exception('problems %s', e)
                 return [None, None]
         except Exception as e:
             logging.exception('problems %s', e)
