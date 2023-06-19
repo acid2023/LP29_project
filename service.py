@@ -9,6 +9,7 @@ import pandas as pd
 import modeling as md
 import modeling_settings as mds
 import io
+import sys
 from bot import TelegramBotHandler
 import telegram
 from telegram.error import TelegramError
@@ -51,14 +52,23 @@ def df_to_excel(df: pd.DataFrame) -> bytes:
         return buffer.getvalue()
 
 
-def create_models(letter: bytes) -> None:
+def create_models(**kwargs) -> None:
     logging.info('creating models')
-    attachment = load_xlsx_from_message(letter['message'])
-    logging.info('attachement found')
-    xlsx_data = attachment[0]['data']
-    xlsx_filename = attachment[0]['filename']
-    df = pd.read_excel(xlsx_data)
-    logging.info(f'loaded attachment - {xlsx_filename}')
+    letter = kwargs.get('letter', False)
+    local = kwargs.get('local', False)
+    if letter:
+        attachment = load_xlsx_from_message(letter['message'])
+        logging.info('attachement found')
+        xlsx_data = attachment[0]['data']
+        xlsx_filename = attachment[0]['filename']
+        df = pd.read_excel(xlsx_data)
+        logging.info(f'loaded attachment - {xlsx_filename}')
+    elif local:
+        logging.info('loading local data')
+        df = pd.read_excel('2Home_data.xlsx')
+        logging.info('local data loaded')
+    else:
+        return
     created_models_dict = md.create_models(df, mds.DefaultColumns)
     logging.info('models created')
     md.save_models(created_models_dict)
@@ -66,12 +76,22 @@ def create_models(letter: bytes) -> None:
     logging.info('no errors found, models saved')
 
 
-def predict_data(letter: bytes) -> None:
+def predict_data(**kwargs) -> None:
+    letter = kwargs.get('letter', False)
+    local = kwargs.get('local', False)
     logging.info('predicting data')
-    attachment = load_xlsx_from_message(letter['message'])
-    logging.info('attachement found')
-    xlsx_data = attachment[0]['data']
-    df = pd.read_excel(xlsx_data)
+    if letter:
+        attachment = load_xlsx_from_message(letter['message'])
+        logging.info('attachement found')
+        xlsx_data = attachment[0]['data']
+        df = pd.read_excel(xlsx_data)
+        logging.info('loaded attachment')
+    elif local:
+        logging.info('loading local data')
+        df = pd.read_excel('TH_0105_1306.xlsx')
+        logging.info('local data loaded')
+    else:
+        return
     logging.info('Loading models')
     models_dict = md.load_models()
     logging.info('Models loaded')
@@ -79,40 +99,51 @@ def predict_data(letter: bytes) -> None:
     logging.info('forecast completed')
     update_trains = df_to_excel(forecast)
     logging.info('updated data on trains compiled')
-    send_letter(letter['sender'], 'forecasted data', message_type='xlsx',
-                attachment=update_trains, filename='update_trains_new.xlsx')
-    logging.info('updates sent, no error found')
-    forecast.to_excel('update_trains.xlsx')
-    logging.info('update saved locally')
+    if letter:
+        send_letter(letter['sender'], 'forecasted data', message_type='xlsx',
+                    attachment=update_trains, filename='update_trains_new.xlsx')
+        logging.info('updates sent, no error found')
+    if letter or local:
+        forecast.to_excel('update_trains.xlsx')
+        logging.info('update saved locally')
 
 
-def main() -> None:
-    emails = get_messages(all_messages=True)
-    logging.info(f'recieved {len(emails)} letters')
-    archive_list = []
-    for letter_num, letter in enumerate(emails):
-        logging.info(f'authorizing user from letter {letter_num}')
-        user_master = (letter['sender'] == ms.master_mail or letter['return_path'] == ms.master_mail)
-        logging.info(f'user master: {user_master}')
-        user_athorized = authorize_user(letter) or user_master
-        logging.info(f"user {letter['sender']} authorized: {user_athorized}")
-        if user_athorized:
-            logging.info('authorizing user done')
-            archive_list.append(letter['message_id'])
-        else:
-            logging.info(f"user {letter['sender']} is not authorized")
-            continue
-        if user_master and letter['subject'] == ms.new_user_subject:
-            logging.info('new user signature creating')
-            signature = generate_new_user_signature(letter)
-            logging.info('signature for new user created')
-            text = f'signature="{signature}"'
-            send_letter(letter['sender'], 'Access to models server', message_type='message', message=text)
-            logging.info('new user signature sent')
-        elif user_athorized and letter['subject'] == ms.creation_subject:
-            create_models(letter)
-        elif user_athorized and letter['subject'] == ms.prediction_subject:
-            predict_data(letter)
+def main(local_mode: bool) -> None:
+    if not local_mode:
+        emails = get_messages(all_messages=True)
+        logging.info(f'recieved {len(emails)} letters')
+        archive_list = []
+        for letter_num, letter in enumerate(emails):
+            logging.info(f'authorizing user from letter {letter_num}')
+            user_master = (letter['sender'] == ms.master_mail or letter['return_path'] == ms.master_mail)
+            logging.info(f'user master: {user_master}')
+            user_athorized = authorize_user(letter) or user_master
+            logging.info(f"user {letter['sender']} authorized: {user_athorized}")
+            if user_athorized:
+                logging.info('authorizing user done')
+                archive_list.append(letter['message_id'])
+            else:
+                logging.info(f"user {letter['sender']} is not authorized")
+                continue
+            if user_master and letter['subject'] == ms.new_user_subject:
+                logging.info('new user signature creating')
+                signature = generate_new_user_signature(letter)
+                logging.info('signature for new user created')
+                text = f'signature="{signature}"'
+                send_letter(letter['sender'], 'Access to models server', message_type='message', message=text)
+                logging.info('new user signature sent')
+            elif user_athorized and letter['subject'] == ms.creation_subject:
+                create_models(letter)
+            elif user_athorized and letter['subject'] == ms.prediction_subject:
+                predict_data(letter)
+    else:
+        select_action = input('select creating or predicting: (1) create/ (2)predict: ')
+        if select_action == '1':
+            create_models(local=True)
+            logging.info('local_mode - creating models')
+        elif select_action == '2':
+            predict_data(local=True)
+            logging.info('local mode - predicting models')
     # archiveing_and_removing_messages()
 
 
@@ -120,9 +151,13 @@ if __name__ == "__main__":
     my_bot = telegram.Bot(token=ms.API_KEY)
     logs_file = start_logging(screen=True)
     logging.info('start')
+    local_mode = len(sys.argv) > 1 and sys.argv[1] == 'local'
+    if local_mode:
+        logging.info('Local mode - saved files will be used for creating or predicting')
     try:
         while True:
-            main()
+            main(local_mode)
+            local_mode = input('continue locally - (y/n)') == 'y'
             if input('stop: (y/n)') == 'y':
                 break
     except (ValueError, AttributeError, TypeError, KeyError, IndexError) as e:

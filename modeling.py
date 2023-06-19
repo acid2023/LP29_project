@@ -7,7 +7,7 @@ import tensorflow as tf
 import pickle
 from typing import Dict, List
 import logging
-import modeling_setting_2 as mds
+import modeling_settings as mds
 import folders
 from folders import folder_check
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -15,28 +15,36 @@ import osm
 import numpy as np
 
 
+#def save_keras(model) -> None:
+
+
+
 def save_models(models_dict: Dict) -> None:
     path = folder_check(folders.models_folder)
     model_filename = f'{path}models_sklearn.pkl'
     sklearn_models = {}
-    models_list = []
+    sklearn_list = []
+    TF_models_list = []
     for model_name, model in models_dict['fit_models'].items():
-        if model_name in mds.TF_models_list:
-            models_list.append(model_name)
-            ts_filename = f'{path}{model_name}.h5'
-            model.save(ts_filename)
-        else:
+        if model_name in mds.sklearn_list:
             sklearn_models[model_name] = model
+            sklearn_list.append(model_name)
+        else:
+            #keras.models.save_model(model.model_, f'{path}{model_name}.h5')
+            model.save(f'{path}{model_name}.h5')
+            TF_models_list.append(model_name)
     with open(model_filename, 'wb') as file:
         pickle.dump(sklearn_models, file)
     with open(f'{path}scalers.pkl', 'wb') as file:
         pickle.dump(models_dict['scalers'], file)
-    with open(f'{path}models_list.pkl', 'wb') as file:
-        pickle.dump(models_list, file)
+    with open(f'{path}TF_models_list.pkl', 'wb') as file:
+        pickle.dump(TF_models_list, file)
+    with open(f'{path}sklearn_list.pkl', 'wb') as file:
+        pickle.dump(sklearn_list, file)
+    with open(model_filename, 'wb') as file:
+        pickle.dump(sklearn_models, file)
     with open(f'{path}models_metrics.pkl', 'wb') as file:
         pickle.dump(models_dict['metrics'], file)
-    with open(f'{path}models_scores.pkl', 'wb') as file:
-        pickle.dump(models_dict['scores'], file)
     with open(f'{path}columns.pkl', 'wb') as file:
         pickle.dump(models_dict['columns'], file)
     with open(f'{path}encoders.pkl', 'wb') as file:
@@ -50,11 +58,12 @@ def load_models() -> Dict:
         columns = pickle.load(file)
     with open(model_filename, 'rb') as file:
         models = pickle.load(file)
-    with open(f'{path}models_list.pkl', 'rb') as file:
+    with open(f'{path}sklearn_list.pkl', 'rb') as file:
         models_list = pickle.load(file)
-    for model_name in models_list:
-        if model_name in mds.TF_models_list:
-            models[model_name] = keras.models.load_model(f'{path}{model_name}.h5')
+    with open(f'{path}TF_models_list.pkl', 'rb') as file:
+        TF_models_list = pickle.load(file)
+    for model_name in TF_models_list:  
+        models[model_name] = keras.models.load_model(f'{path}{model_name}.h5')
     scalers = pickle.load(open(f'{path}scalers.pkl', 'rb'))
     encoders = pickle.load(open(f'{path}encoders.pkl', 'rb'))
     return {'models': models, 'scalers': scalers, 'encoders': encoders, 'columns': columns}
@@ -177,11 +186,11 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
         X = encoded_roads[columns_list]
         columns[name] = columns_list
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-#        if name in TF_models_list:
-#            X_train = tf.convert_to_tensor(X_train, dtype=tf.float32)
-#            y_train = tf.convert_to_tensor(y_train, dtype=tf.float32)
-#            X_test = tf.convert_to_tensor(X_test, dtype=tf.float32)
- #           y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
+        if name in TF_models_list:
+            X_train = tf.convert_to_tensor(X_train, dtype=tf.float32)
+            y_train = tf.convert_to_tensor(y_train, dtype=tf.float32)
+            X_test = tf.convert_to_tensor(X_test, dtype=tf.float32)
+            y_test = tf.convert_to_tensor(y_test, dtype=tf.float32)
         fit_models[name] = model.fit(X_train, y_train)
   #      if name in TF_models_list:
    #         fit_models[name] = model.model
@@ -196,12 +205,12 @@ def create_models(df: pd.DataFrame, columns_list: List) -> Dict:
     logging.info('Calculating metrics')
     metrics = get_models_metrics(fit_models, metrics_data)
     logging.info('Metrics calculated')
-    logging.info(f"Metrics: \n{metrics.to_markdown()}")
-    logging.info('Calculating scores')
+    logging.info(f"Metrics: \n{metrics}")
+    # logging.info('Calculating scores')
     scores = {}
     # cross_validation_test(fit_models, metrics_data)
-    logging.info('Scores calculated')
-    logging.info(f"Scores: \n{scores.to_markdown()}")
+    # logging.info('Scores calculated')
+    # logging.info(f"Scores: \n{scores}")
     return {'fit_models': fit_models,
             'encoders': {'road_encoder': road_encoder},
             'scalers': scalers, 'metrics': metrics, 'scores': scores, 'columns': columns}
@@ -239,8 +248,8 @@ def prediction(df: pd.DataFrame, models_dict: Dict) -> pd.DataFrame:
     for name, model in models_dict['models'].items():
         logging.info(f'predicting for model {name} started')
         update_X = update_trains[models_dict['columns'][name]]
-        update_X.dropna().index_reset()
-        if name in mds.TF_models_list:
+        update_X.dropna().reset_index(drop=True)
+        if name.startswith('TensorFlow'):
             update_X = tf.convert_to_tensor(update_X, dtype=tf.float32)
         update_Y = model.predict(update_X)
         logging.info(f'predicting for model {name} finished')

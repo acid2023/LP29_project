@@ -19,42 +19,36 @@ import logging
 
 DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'in_train', 'start_lat', 'start_lon']
 TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', ]
-TF_number_of_epochs = 100
+TF_number_of_epochs = 200
 TF_batch_size = 32
-TF_neurons = 256
+TF_neurons = 512
 TF_learning_rate = 0.00001
 TF_input_shape = (None, )
 
 
-def declare_keras_models(models_dict: dict, num_features: int) -> dict:
-    class MyKerasRegressor(KerasRegressor, BaseEstimator, RegressorMixin):
+class CustomKerasRegressor(KerasRegressor, BaseEstimator, RegressorMixin):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             self.model_ = None
 
         def fit(self, X, y, **kwargs):
-            X = tf.convert_to_tensor(X, dtype=tf.float32)
-            y = tf.convert_to_tensor(y, dtype=tf.float32)
+            if not tf.is_tensor(X):
+                X = tf.convert_to_tensor(X, dtype=tf.float32)
+            if not tf.is_tensor(y):
+                y = tf.convert_to_tensor(y, dtype=tf.float32)
             history = super().fit(X, y, **kwargs)
             self.model_ = history.model  # store the trained model in the instance variable
             return self.model_
         
-        def predict(self, X):
-            if not isinstance(X, (tf.Tensor, tf.compat.v1.Tensor, tf.python.framework.ops.EagerTensor)):
-                X = tf.convert_to_tensor(X, dtype=tf.float32) 
-            return self.model_.predict(X)
-     
-    class CustomKerasRegressor(MyKerasRegressor, BaseWrapper):
-        """Wrapper class to make KerasRegressor work with Scikit-learn's cross-validation."""
-        def __init__(self, build_fn=None, **sk_params):
-            self.build_fn = build_fn
-            self.sk_params = sk_params
+        def save_model(self, filepath):
+            self.model_.save(filepath)
+        
+   #     def predict(self, X):
+   #         if not isinstance(X, (tf.Tensor, tf.compat.v1.Tensor, tf.python.framework.ops.EagerTensor)):
+    #            X = tf.convert_to_tensor(X, dtype=tf.float32) 
+     #       return self.model_.predict(X)
 
-        def __call__(self, **kwargs):
-            return self.build_fn(**{**self.sk_params, **kwargs})
-
-        def get_params(self, **params):
-            return {**self.sk_params, **params}
+def declare_keras_models(models_dict: dict, num_features: int) -> dict:
     def TensorFlow_Relu_Elu_Selu_Nadam() -> keras.Sequential:
         model = keras.Sequential([layers.Dense(TF_neurons, activation='relu', input_shape=(None, num_features)),
                                   layers.Dense(TF_neurons, activation='elu'),
@@ -113,9 +107,9 @@ models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=4
           'BayesianRidge': BayesianRidge(),
           'ARDRegression': ARDRegression(),
           # 'LogisticRegression': LogisticRegression(),
-          'SGDRegressor': SGDRegressor(),
+          # 'SGDRegressor': SGDRegressor(),
           'PassiveAggressiveRegressor': PassiveAggressiveRegressor(),
-          'HuberRegressor': HuberRegressor(),
+          #'HuberRegressor': HuberRegressor(),
           'RANSACRegressor': RANSACRegressor(),
           'ElasticNet': ElasticNet(),
           'LassoLars': LassoLars(),
