@@ -56,7 +56,7 @@ def df_to_excel(df: pd.DataFrame) -> bytes:
         return buffer.getvalue()
 
 
-def create_models(**kwargs: str | email.Message) -> None:
+def create_models(**kwargs: str | email.message.Message) -> None:
     logging.info('creating models')
     letter = kwargs.get('letter', False)
     local = kwargs.get('local', False)
@@ -80,7 +80,7 @@ def create_models(**kwargs: str | email.Message) -> None:
     logging.info('no errors found, models saved')
 
 
-def predict_data(**kwargs: str | email.Message) -> None:
+def predict_data(**kwargs: str | email.message.Message) -> None:
     letter = kwargs.get('letter', False)
     local = kwargs.get('local', False)
     logging.info('predicting data')
@@ -139,7 +139,7 @@ def main(local_mode: bool) -> None:
             elif user_athorized and letter['subject'] == ms.creation_subject:
                 create_models(letter)
             elif user_athorized and letter['subject'] == ms.prediction_subject:
-                predict_data(letter)
+                predict_data(letter=letter)
     else:
         select_action = input('select creating or predicting: (1) create/ (2)predict: ')
         if select_action == '1':
@@ -153,7 +153,7 @@ def main(local_mode: bool) -> None:
 
 if __name__ == "__main__":
     my_bot = telegram.Bot(token=ms.API_KEY)
-    logs_file = start_logging(screen=True)
+    logs_file = start_logging(screen=True, bot=my_bot)
     logging.info('start')
     local_mode = len(sys.argv) > 1 and sys.argv[1] == 'local'
     if local_mode:

@@ -28,12 +28,12 @@ def stmp_login() -> smtplib.SMTP_SSL:
     return smtp
 
 
-def message_extract(imap: imaplib.IMAP4_SSL, request: bytes) -> email.Message:
+def message_extract(imap: imaplib.IMAP4_SSL, request: bytes) -> email.message.Message:
     _, response = imap.fetch(request, '(RFC822)')
     return email.message_from_bytes(response[0][1])
 
 
-def get_message_by_id(message_id: bytes) -> email.Message:
+def get_message_by_id(message_id: bytes) -> email.message.Message:
     return message_extract(imap_login(), message_id)
 
 
@@ -44,7 +44,7 @@ def decode(bytes: bytes) -> str:
         return bytes
 
 
-def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.Message, str, datetime]]]:
+def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.message.Message, str, datetime]]]:
     email_pattern = r'<([^<>]+)>'
     logging.info('getting messages from INBOX')
 

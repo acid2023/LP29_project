@@ -129,7 +129,7 @@ def smooth_data(data: pd.DataFrame, filter_type: str = 'none') -> pd.DataFrame:
 
 def cross_validation_test(models: Dict[str, object],
                           metrics_data: Dict[str, Union[Tuple[pd.DataFrame, pd.Series], Tuple[tf.Tensor, tf.Tensor]]]
-                          ) -> pd.Dataframe:
+                          ) -> pd.DataFrame:
     def cross_validate(
             model: object, X: Union[pd.DataFrame, tf.Tensor], y: Union[pd.Series, tf.Tensor],
             n_splits: int = 5
@@ -235,7 +235,10 @@ def create_models(
 
 def preprocessing_update_trains(df: pd.DataFrame) -> pd.DataFrame:
     df = df.replace({'': np.nan, 'NA': np.nan, 'None': np.nan})
-    # df.dropna(inplace=True)
+    df = df.loc[['расстояние до Лены', 'ops station', 'start', 'in_train', 'ops road', 'update']]
+    df.dropna(subset=['расстояние до Лены', 'ops station', 'start', 'in_train', 'ops road'], inplace=True)
+    df.reset_index()
+
     df['DLeft'] = df['расстояние до Лены'].astype(int)
 
     logging.info('starting coding stations')
@@ -248,6 +251,8 @@ def preprocessing_update_trains(df: pd.DataFrame) -> pd.DataFrame:
     osm.save_coordinates_dict()
     logging.info('finished coding stations')
 
+    df = df.replace({'': np.nan, 'NA': np.nan, 'None': np.nan})
+    df.dropna()
     df['o_road'] = df['ops road']
     df.drop(df[df['update'] < pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
     return df.reset_index(drop=True)
@@ -269,7 +274,8 @@ def prediction(df: pd.DataFrame,
     for name, model in models_dict['models'].items():
         logging.info(f'predicting for model {name} started')
         update_X = update_trains[models_dict['columns'][name]]
-        update_X.dropna().reset_index(drop=True)
+        update_X.dropna()
+        update_X.reset_index(drop=True)
         if name.startswith('TensorFlow'):
             update_X = tf.convert_to_tensor(update_X, dtype=tf.float32)
         update_Y = model.predict(update_X)

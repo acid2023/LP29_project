@@ -2,7 +2,7 @@ import re
 import requests
 import logging
 import pickle
-from typing import List
+from typing import Tuple
 
 import folders
 
@@ -10,7 +10,7 @@ coordinates_filename = "coordinates_dict.pkl"
 station_coords = {}
 
 
-def fetch_coordinates(station: str) -> List[float, float]:
+def fetch_coordinates(station: str) -> Tuple[float, float]:
     global station_coords
     url = 'https://nominatim.openstreetmap.org/search?'
     pattern = r'\([^)]*\)'
