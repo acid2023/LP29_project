@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import datetime
 
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -75,21 +76,58 @@ def load_models() -> Dict[str, Union[Dict[str, object], Dict[str, StandardScaler
     return {'models': models, 'scalers': scalers, 'encoders': encoders, 'columns': columns}
 
 
+def to_datetime_days(days_timestamp):
+    """Convert a Unix timestamp in days to a datetime object."""
+    return datetime.datetime.fromtimestamp(days_timestamp * 86400)
+
+def to_timestamp_days(date):
+    """Convert a datetime object to a Unix timestamp in days."""
+    return int(datetime.datetime.timestamp(date) / 86400)
+
 def preprocessing_trains(df: pd.DataFrame) -> pd.DataFrame:
-    df.dropna(subset=['ops station', 'o_road', 'to_home'], inplace=True)
+    df.dropna(subset=['DLeft', 'ops station', 'o_road', 'to_home'], inplace=True)
     df.reset_index(drop=True)
 
     logging.info('starting coding stations')
+    df = df[df['ops station'] != -904851]
     df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
     df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
-    df['start_lat'] = df['start'].apply(lambda x: osm.fetch_coordinates(x)[0])
-    df['start_lon'] = df['start'].apply(lambda x: osm.fetch_coordinates(x)[1])
-    df.drop(['ops station', 'start'], axis=1, inplace=True)
+    df.drop(['ops station'], axis=1, inplace=True)
+    df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
+    df.reset_index(drop=True)
     osm.save_coordinates_dict()
     logging.info('finished coding stations')
 
-    df.drop(df[df['update'] >= pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
-    return df.reset_index(drop=True)
+    df.drop(df.loc[df['update'] >= pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
+    df.reset_index(drop=True)
+    logging.info('coverting update times')
+    df['update'] = pd.to_datetime(df['update']).apply(to_timestamp_days)
+    logging.info('finished converting update times')
+    return df.reset_index()
+
+
+def preprocessing_updates(df: pd.DataFrame) -> pd.DataFrame:
+    df.dropna(subset=['DLeft', 'ops station', 'o_road', 'to_home'], inplace=True)
+    df.reset_index(drop=True)
+
+    logging.info('starting coding stations')
+    df = df[df['ops station'] != -904851]
+    df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
+    df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
+    df.drop(['ops station'], axis=1, inplace=True)
+    df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
+    df.reset_index(drop=True)
+    osm.save_coordinates_dict()
+    logging.info('finished coding stations')
+
+    df.drop(df.loc[df['update'] < pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
+    df.reset_index(drop=True)
+
+    logging.info('coverting update times')
+    df['update'] = pd.to_datetime(df['update']).apply(to_timestamp_days)
+    logging.info('finished converting update times')
+
+    return df.reset_index()
 
 
 def one_hot_encoder_training(df: pd.DataFrame | np.ndarray) -> OneHotEncoder:
@@ -181,15 +219,23 @@ def create_models(
                              Dict[str, StandardScaler], Dict[str, Tuple[float, float]],
                              Dict[str, float], Dict[str, pd.DataFrame], Dict[str, List[str]]]]:
     logging.info('Started preprocessing')
+    df.to_pickle('df.pkl')
     trains = preprocessing_trains(df)
+    df.to_pickle('df1.pkl')
+    trains.to_pickle('trains0.pkl')
+    trains.reset_index()
+    trains.to_pickle('trains1.pkl')
     logging.info('Preprocessing done')
 
     road_encoder = one_hot_encoder_training(trains)
     encoded_roads = one_hot_encoding(trains, road_encoder)
+    trains.to_pickle('trains2.pkl')
+    encoded_roads.reset_index()
     one_hot_encoded_columns = [col for col in encoded_roads.columns.astype(str) if col.startswith('o_road_x0_')]
     logging.info('encoding roads done')
 
-    y = smooth_data(trains['to_home'], mds.filter_type)
+    #y = smooth_data(encoded_roads['to_home'], mds.filter_type)
+
     logging.info('Filtering done')
 
     logging.info('Fitting models')
@@ -208,7 +254,12 @@ def create_models(
             columns_list = keras_columns_list
         elif name in mds.sklearn_list:
             columns_list = mds.DefaultColumns + one_hot_encoded_columns
+        trains.to_pickle('trains.pkl')
+        encoded_roads.to_pickle('encoded.pkl')
         X = encoded_roads[columns_list]
+        X.to_pickle('X.pkl')
+        y = encoded_roads['to_home']
+        y.to_pickle('y.pkl')
         columns[name] = columns_list
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         if name in TF_models_list:
@@ -255,6 +306,7 @@ def preprocessing_update_trains(df: pd.DataFrame) -> pd.DataFrame:
     df.dropna()
     df['o_road'] = df['ops road']
     df.drop(df[df['update'] < pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
+    df['update'] = pd.to_datetime(df['update']).apply(datetime.datetime.timestamp)
     return df.reset_index(drop=True)
 
 
@@ -264,11 +316,12 @@ def prediction(df: pd.DataFrame,
                    Dict[str, OneHotEncoder], Dict[str, List[str]]
                 ]]) -> pd.DataFrame:
     logging.info('Started preprocessing')
-    preprocessed_df = preprocessing_update_trains(df)
+    preprocessed_df = preprocessing_updates(df)
     road_encoder = models_dict['encoders']['road_encoder']
     update_trains = one_hot_encoding(preprocessed_df, road_encoder)
-
+    delivery = pd.to_datetime(update_trains['update']).apply(to_datetime_days)
     logging.info('Preprocessing done')
+
     logging.info('Predicting')
     columns_to_keep = []
     for name, model in models_dict['models'].items():
@@ -280,15 +333,18 @@ def prediction(df: pd.DataFrame,
             update_X = tf.convert_to_tensor(update_X, dtype=tf.float32)
         update_Y = model.predict(update_X)
         logging.info(f'predicting for model {name} finished')
+        logging.info('setting/coverting times')
         duration = 'duration_' + name
         update_trains[duration] = pd.DataFrame(update_Y)
         expected_delivery = 'expected_delivery_' + name
         timedelta = pd.to_timedelta(update_trains[duration], unit='D')
-        update_trains[expected_delivery] = pd.to_datetime(update_trains['update']) + timedelta
+        update_trains[expected_delivery] = delivery + timedelta
         update_trains[expected_delivery] = pd.to_datetime(update_trains[expected_delivery])
+        logging.info('setting/coverting times done')
         columns_to_keep.append(duration)
         columns_to_keep.append(expected_delivery)
     logging.info('Predicting done')
+    update_trains['update'] = delivery
     columns_to_keep.append('update')
     columns_to_keep.append('котлов')
     columns_to_keep.append('_num')

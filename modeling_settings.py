@@ -16,15 +16,15 @@ from typing import Dict
 
 DefaultTrainingDateCut = '2023-05-15'
 filter_types = ['savgol', 'butter', 'none']
-filter_type = filter_types[1]
+filter_type = filter_types[2]
 
-DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'in_train', 'start_lat', 'start_lon']
+DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update']
 
-TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', ]
-TF_number_of_epochs = 200
+TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update']
+TF_number_of_epochs = 150
 TF_batch_size = 32
 TF_neurons = 512
-TF_learning_rate = 0.00001
+TF_learning_rate = 0.0001
 TF_input_shape = (None, )
 
 
@@ -61,11 +61,9 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int) -> D
     def TensorFlow_Synthetic() -> keras.Sequential:
         model = keras.Sequential([layers.Dense(TF_neurons, activation='relu', input_shape=(None, num_features)),
                                   layers.Dense(TF_neurons * 2, activation='softplus'),
-                                  layers.Dense(TF_neurons * 4, activation='softmax'),
-                                  layers.Dense(TF_neurons * 2, activation='elu'),
                                   layers.Dense(TF_neurons, activation='relu'),
                                   layers.Dense(1)])
-        optimizer = keras.optimizers.Adam(learning_rate=TF_learning_rate)
+        optimizer = keras.optimizers.Nadam(learning_rate=TF_learning_rate)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
