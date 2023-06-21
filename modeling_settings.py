@@ -21,10 +21,10 @@ filter_type = filter_types[2]
 DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update']
 
 TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update']
-TF_number_of_epochs = 150
-TF_batch_size = 32
+TF_number_of_epochs = 200
+TF_batch_size = 64
 TF_neurons = 512
-TF_learning_rate = 0.0001
+TF_learning_rate = 0.00001
 TF_input_shape = (None, )
 
 
