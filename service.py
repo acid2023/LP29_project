@@ -5,6 +5,7 @@ from telegram.error import TelegramError
 
 import io
 import sys
+import os
 import time
 import logging
 import email
@@ -56,9 +57,29 @@ def df_to_excel(df: pd.DataFrame) -> bytes:
         return buffer.getvalue()
 
 
+def load_dataframe(filename):
+    # Define the file paths for the pickle file and Excel file
+    pickle_file = filename + '.pkl'
+    excel_file = filename + '.xlsx'
+
+    # Load the DataFrame from the pickle file if it exists
+    if os.path.isfile(pickle_file):
+        df = pd.read_pickle(pickle_file)
+    else:
+        df = pd.read_excel(excel_file)
+
+        # Save the DataFrame to a pickle file
+        df.to_pickle(pickle_file)
+
+    return df
+
+
 def create_models(**kwargs: str | email.message.Message) -> None:
     logging.info('creating models')
     letter = kwargs.get('letter', False)
+    filename = kwargs.get('filename', False)
+    if not filename:
+        filename = 'TH_0105_2006'
     local = kwargs.get('local', False)
     if letter:
         attachment = get_data_from_message(letter['message'], get_type='xlsx')
@@ -69,7 +90,7 @@ def create_models(**kwargs: str | email.message.Message) -> None:
         logging.info(f'loaded attachment - {xlsx_filename}')
     elif local:
         logging.info('loading local data')
-        df = pd.read_excel('2Home_data.xlsx')
+        df = load_dataframe(filename)
         logging.info('local data loaded')
     else:
         return
@@ -92,14 +113,11 @@ def predict_data(**kwargs: str | email.message.Message) -> None:
         logging.info('loaded attachment')
     elif local:
         logging.info('loading local data')
-        df = pd.read_excel('TH_0105_1306.xlsx')
+        df = load_dataframe(filename)
         logging.info('local data loaded')
     else:
         return
-    logging.info('Loading models')
-    models_dict = md.load_models()
-    logging.info('Models loaded')
-    forecast = md.prediction(df, models_dict)
+    forecast = md.prediction(df)
     logging.info('forecast completed')
     update_trains = df_to_excel(forecast)
     logging.info('updated data on trains compiled')
@@ -112,7 +130,7 @@ def predict_data(**kwargs: str | email.message.Message) -> None:
         logging.info('update saved locally')
 
 
-def main(local_mode: bool) -> None:
+def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> None:
     if not local_mode:
         emails = get_messages(all_messages=True)
         logging.info(f'recieved {len(emails)} letters')
@@ -141,26 +159,45 @@ def main(local_mode: bool) -> None:
             elif user_athorized and letter['subject'] == ms.prediction_subject:
                 predict_data(letter=letter)
     else:
-        select_action = input('select creating or predicting: (1) create/ (2)predict: ')
+        if not local_choice:
+            select_action = input('select action: (1) create/ (2)predict/ (3) validation test/ (4) post modeling validation: ')
+        else:
+            select_action = local_choice
         if select_action == '1':
-            create_models(local=True)
             logging.info('local_mode - creating models')
+            create_models(local=True, filename=filename)
         elif select_action == '2':
-            predict_data(local=True)
             logging.info('local mode - predicting models')
+            predict_data(local=True, filename=filename)
+        elif select_action == '3':
+            logging.info('local mode - validation test')
+            df = load_dataframe(filename)
+            md.validate_models(df)
+        elif select_action == '4':
+            logging.info('local mode - post modeling validation test')
+            df = load_dataframe(filename)
+            md.validating_on_post_data(df)
+
     # archiveing_and_removing_messages()
 
 
 if __name__ == "__main__":
     my_bot = telegram.Bot(token=ms.API_KEY)
-    logs_file = start_logging(screen=True, bot=my_bot)
+    logs_file = start_logging(screen=True)
     logging.info('start')
-    local_mode = len(sys.argv) > 1 and sys.argv[1] == 'local'
+    arguments = len(sys.argv)
+    local_mode = arguments > 1 and sys.argv[1] == 'local'
+    filename = False
+    local_choice = False
+    if arguments >= 3:
+        filename = sys.argv[2]
+    if arguments >= 4:
+        local_choice = sys.argv[3]
     if local_mode:
         logging.info('Local mode - saved files will be used for creating or predicting')
     try:
         while True:
-            main(local_mode)
+            main(local_mode, filename, local_choice)
             local_mode = input('continue locally - (y/n)') == 'y'
             if input('stop: (y/n)') == 'y':
                 break
