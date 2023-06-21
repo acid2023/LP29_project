@@ -44,8 +44,13 @@ def decode(bytes: bytes) -> str:
         return bytes
 
 
-def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.message.Message, str, datetime]]]:
+def get_sender(msg_from: str):
     email_pattern = r'<([^<>]+)>'
+    return re.search(email_pattern, msg_from).group(1)
+
+
+def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.message.Message, str, datetime]]]:
+
     logging.info('getting messages from INBOX')
 
     mail = imap_login()
@@ -61,7 +66,7 @@ def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.messag
         message_id = msg['Message-ID']
         subject = decode(msg['Subject'])
         logging.info(f'Message {num}, subject - {subject}')
-        sender = re.search(email_pattern, msg['From']).group(1)
+        sender = get_sender(msg['From'])
         msg_date = msg['Date']
         return_path = msg['Return-path']
         emails_list.append({'message_id': message_id,
@@ -82,21 +87,26 @@ def archiveing_and_removing_messages(archive_list: List[bytes]) -> None:
         msg = message_extract(mail, message_num)
         if msg['Message-ID'] in archive_list:
             mail.copy(message_num, "ARCHIVE")
-            logging.info(f"message from authorized user {msg['From']} copyied to ARCHIVE")
+            logging.info(f"message from authorized user {get_sender(msg['From'])} copyied to ARCHIVE")
         else:
             mail.copy(message_num, "TRASH")
-            logging.info(f"message from unauthorized user {msg['From']} copyied to TRASH")
+            logging.info(f"message from unauthorized user {get_sender(msg['From'])} copyied to TRASH")
         mail.store(message_num, "+FLAGS", '\\Deleted')
     logging.info("messages removed")
 
 
-def get_data_from_message(message: bytes, **kwargs: str) -> str | List[Dict[str, Union[str, IO]]]:
+def get_data_from_message(message: bytes, **kwargs: str) -> Union[str, bytes] | List[Dict[str, Union[str, IO]]]:
     get_type = kwargs.get('get_type')
     if get_type == 'text':
         text_parts = []
         for part in message.walk():
+            payload = part.get_payload(decode=False)
             if part.get_content_type() == 'text/plain':
-                text_parts.append(part.get_payload(decode=True).decode('utf-8'))
+                if isinstance(payload, bytes):
+                    text = payload.decode('utf-8')
+                else:
+                    text = payload
+                text_parts.append(text)
         text = '\n'.join(text_parts)
         return text
     elif get_type == 'xlsx':
@@ -110,6 +120,13 @@ def get_data_from_message(message: bytes, **kwargs: str) -> str | List[Dict[str,
                 xlsx_data = part.get_payload(decode=True)
                 xlsx_files.append({'filename': filename, 'data': xlsx_data})
         return xlsx_files
+    elif get_type == 'signature':
+        text_parts = []
+        for part in message.walk():
+            if part.get_content_type() == 'text/plain':
+                text_parts.append(part.get_payload(decode=True).decode('utf-8'))
+            text = '\n'.join(text_parts)
+        return text
     else:
         raise ValueError('Invalid get_type argument')
 

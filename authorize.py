@@ -31,7 +31,7 @@ def generate_signature(username: str) -> bytes:
 def get_signature(letter: object) -> bytes:
     pattern = r'signature=[\'"]b\'([\w+/=]+)\'[\'"]'
     message = letter['message']
-    letter_text = get_data_from_message(message, get_type='text')
+    letter_text = get_data_from_message(message, get_type='signature')
     match = re.search(pattern, letter_text)
     if match:
         signature = match.group(1).strip()

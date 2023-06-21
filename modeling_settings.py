@@ -3,7 +3,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.linear_model import Ridge, Lasso, ElasticNet, Lars, LassoLars, OrthogonalMatchingPursuit
 from sklearn.linear_model import BayesianRidge, ARDRegression, PassiveAggressiveRegressor, RANSACRegressor
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.neural_network import MLPRegressor
+# from sklearn.neural_network import MLPRegressor
 from sklearn.base import BaseEstimator, RegressorMixin
 
 from tensorflow import keras
@@ -21,9 +21,9 @@ filter_type = filter_types[2]
 DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update']
 
 TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update']
-TF_number_of_epochs = 200
-TF_batch_size = 64
-TF_neurons = 512
+TF_number_of_epochs = 150
+TF_batch_size = 32
+TF_neurons = 256
 TF_learning_rate = 0.00001
 TF_input_shape = (None, )
 
@@ -61,9 +61,9 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int) -> D
     def TensorFlow_Synthetic() -> keras.Sequential:
         model = keras.Sequential([layers.Dense(TF_neurons, activation='relu', input_shape=(None, num_features)),
                                   layers.Dense(TF_neurons * 2, activation='softplus'),
-                                  layers.Dense(TF_neurons, activation='relu'),
+                                  layers.Dense(TF_neurons * 2, activation='relu'),
                                   layers.Dense(1)])
-        optimizer = keras.optimizers.Nadam(learning_rate=TF_learning_rate)
+        optimizer = keras.optimizers.Adam(learning_rate=TF_learning_rate)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
@@ -85,13 +85,11 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int) -> D
     return models_dict
 
 
-models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=42, max_depth=100),
+models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=42, max_depth=1000),
           'DecisionTree': DecisionTreeRegressor(max_depth=1000, random_state=42),
           'KNeighbors': KNeighborsRegressor(n_neighbors=5),
-          'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=300, max_depth=100),
-          'GradientBoosting': GradientBoostingRegressor(n_estimators=300, learning_rate=0.75, random_state=42),
-          'MLP': MLPRegressor(hidden_layer_sizes=(256, 256, 128), activation='relu', solver='adam', random_state=42,
-                              max_iter=1000),
+          'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=500, max_depth=1000),
+          'GradientBoosting': GradientBoostingRegressor(n_estimators=500, learning_rate=0.25, random_state=42),
           'Ridge': Ridge(alpha=1.0),
           'Lasso': Lasso(alpha=1.0),
           'Lars': Lars(n_nonzero_coefs=10),
@@ -102,7 +100,7 @@ models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=4
           'RANSACRegressor': RANSACRegressor(),
           'ElasticNet': ElasticNet(),
           'LassoLars': LassoLars(),
-          'AdaBoost': AdaBoostRegressor(random_state=42, n_estimators=300)}
+          'AdaBoost': AdaBoostRegressor(random_state=42, n_estimators=500)}
 
 
 sklearn_list = list(models.keys())

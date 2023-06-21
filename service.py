@@ -10,7 +10,7 @@ import time
 import logging
 import email
 
-from mail import get_data_from_message, get_messages, send_letter
+from mail import get_data_from_message, get_messages, send_letter, archiveing_and_removing_messages
 import mail_settings as ms
 from authorize import authorize_user, generate_new_user_signature
 from folders import folder_check
@@ -158,6 +158,9 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
                 create_models(letter)
             elif user_athorized and letter['subject'] == ms.prediction_subject:
                 predict_data(letter=letter)
+        if archive_list:
+            logging.info('archiving messages from authorized users')
+            archiveing_and_removing_messages(archive_list)
     else:
         if not local_choice:
             select_action = input('select action: (1) create/ (2)predict/ (3) validation test/ (4) post modeling validation: ')
@@ -178,8 +181,6 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
             df = load_dataframe(filename)
             md.validating_on_post_data(df)
 
-    # archiveing_and_removing_messages()
-
 
 if __name__ == "__main__":
     my_bot = telegram.Bot(token=ms.API_KEY)
@@ -198,7 +199,6 @@ if __name__ == "__main__":
     try:
         while True:
             main(local_mode, filename, local_choice)
-            local_mode = input('continue locally - (y/n)') == 'y'
             if input('stop: (y/n)') == 'y':
                 break
     except (ValueError, AttributeError, TypeError, KeyError, IndexError) as e:

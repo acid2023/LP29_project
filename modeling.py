@@ -213,9 +213,6 @@ def create_models(
     logging.info('Calculating metrics')
     metrics = get_models_metrics(fit_models, metrics_data)
     metrics = metrics.T
-    metrics = metrics.set_index(pd.Index(list(metrics.keys()), name='Model'))
-    metrics.index.name = 'Model'
-
     table_data = metrics.reset_index().values.tolist()
     table_headers = [''] + list(metrics.columns)
 
@@ -403,7 +400,8 @@ def validating_on_post_data(df: pd.DataFrame) -> pd.DataFrame:
     logging.info('finished validation on post modeling data')
     logging.info('compiling metrics')
 
-    metrics_by_model = {model: {date: metrics[date][model] for date in metrics} for model in metrics[list(metrics.keys())[0]]}
+    metrics_by_model = {model: {date: metrics[date][model] for date in metrics}
+                        for model in metrics[list(metrics.keys())[0]]}
 
     mean_metrics_by_model = {}
     for model in metrics_by_model:
