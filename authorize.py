@@ -70,10 +70,10 @@ def generate_new_user_signature(letter: email.message.Message) -> bytes | None:
     if match:
         email_address = match.group(1)
         signature = generate_signature(email_address)
-        logging.info('sugnature generated')
+        logging.error('sugnature generated')
         return signature
     else:
-        logging.info('signature was not generated')
+        logging.error('signature was not generated')
         return None
 
 

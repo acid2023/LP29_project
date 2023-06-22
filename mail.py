@@ -51,7 +51,7 @@ def get_sender(msg_from: str):
 
 def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.message.Message, str, datetime]]]:
 
-    logging.info('getting messages from INBOX')
+    logging.error('getting messages from INBOX')
 
     mail = imap_login()
     mail.select('INBOX')
@@ -65,7 +65,7 @@ def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.messag
         msg = message_extract(mail, message_num)
         message_id = msg['Message-ID']
         subject = decode(msg['Subject'])
-        logging.info(f'Message {num}, subject - {subject}')
+        logging.error(f'Message {num}, subject - {subject}')
         sender = get_sender(msg['From'])
         msg_date = msg['Date']
         return_path = msg['Return-path']
@@ -79,7 +79,7 @@ def get_messages(all_messages=False) -> List[Dict[str, Union[bytes, email.messag
 
 
 def archiveing_and_removing_messages(archive_list: List[bytes]) -> None:
-    logging.info("archieving and removing  messages")
+    logging.error("archieving and removing  messages")
     mail = imap_login()
     _, data = mail.search(None, 'ALL')
     message_nums = data[0].split()
@@ -87,10 +87,10 @@ def archiveing_and_removing_messages(archive_list: List[bytes]) -> None:
         msg = message_extract(mail, message_num)
         if msg['Message-ID'] in archive_list:
             mail.copy(message_num, "ARCHIVE")
-            logging.info(f"message from authorized user {get_sender(msg['From'])} copyied to ARCHIVE")
+            logging.error(f"message from authorized user {get_sender(msg['From'])} copyied to ARCHIVE")
         else:
             mail.copy(message_num, "TRASH")
-            logging.info(f"message from unauthorized user {get_sender(msg['From'])} copyied to TRASH")
+            logging.error(f"message from unauthorized user {get_sender(msg['From'])} copyied to TRASH")
         mail.store(message_num, "+FLAGS", '\\Deleted')
     logging.info("messages removed")
 

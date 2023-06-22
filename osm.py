@@ -98,11 +98,11 @@ def fetch_coordinates(station: str) -> Tuple[float, float]:
         try:
             coords = [results[0]['lat'], results[0]['lon']]
             if coords:
-                logging.info(f'coordinates for {station} found')
+                logging.error(f'coordinates for {station} found')
                 station_coords[station] = coords
                 return coords
             else:
-                logging.info('problems parsing geodata')
+                logging.error('problems parsing geodata')
         except Exception as e:
             logging.exception('problems %s', e)
             return [None, None]
