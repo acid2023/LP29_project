@@ -55,7 +55,7 @@ def fetch_coords_from_dicts(station: str) -> Tuple[float, float]:
 
     ops_id = get_code(station)
 
-    location = station.split(' ')[0].upper()[:-1]
+    location = station.split(' ')[0].upper().rstrip()
     if ops_id:
         coords = dict_ops_id.get(ops_id, None)
         ops_id_2 = ops_id[:-1]
@@ -91,7 +91,7 @@ def fetch_coordinates(station: str) -> Tuple[float, float]:
 
     try:
         location = re.sub(pattern, "", station).strip()
-        params = {'q': location, 'format': 'json', 'railway': 'station' | 'stop' | 'halt'}
+        params = {'q': location, 'format': 'json', 'railway': 'station, stop, halt'}
         response = requests.get(f"{url}{'&'.join([f'{k}={v}' for k, v in params.items()])}")
         results = response.json()
 
@@ -103,12 +103,13 @@ def fetch_coordinates(station: str) -> Tuple[float, float]:
                 return coords
             else:
                 logging.error('problems parsing geodata')
+                return [0, 0]
         except Exception as e:
             logging.exception('problems %s', e)
-            return [None, None]
+            return [0, 0]
     except Exception as e:
         logging.exception('problems %s', e)
-        return [None, None]
+        return [0, 0]
 
 
 load_coordinates_dict()

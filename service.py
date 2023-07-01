@@ -156,7 +156,7 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
             logging.errr('archiving messages from authorized users')
             archiveing_and_removing_messages(archive_list)
     else:
-        request = 'select action: (1) create/ (2)predict/ (3) validation test/ (4) post modeling validation/ (5) KeraTune/ (6) exit: '
+        request = 'select action: (1) create/ (2)predict/ (3) validation test/ (4) post modeling validation/ (5) exit: '
         if not local_choice:
             select_action = input(request)
         else:
@@ -176,14 +176,11 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
             df = load_dataframe(filename)
             md.validating_on_post_data(df)
         elif select_action == '5':
-            logging.info('local mode - KeraTuning model')
-            md.KeraTune()
-        elif select_action == '6':
             exit(0)
 
 
 if __name__ == "__main__":
-    my_bot = telegram.Bot(token=ms.API_KEY)
+    # telegram.Bot(token=ms.API_KEY)
     logs_file = start_logging(screen=True)
     logging.error('start')
     arguments = len(sys.argv)
@@ -208,7 +205,8 @@ if __name__ == "__main__":
         logging.exception('unknown error found: %s', e)
     finally:
         try:
-            send_letter(ms.master_mail, 'logs', message_type='logs', filename=logs_file)
+            if not local_mode:
+                send_letter(ms.master_mail, 'logs', message_type='logs', filename=logs_file)
             logging.info('logs sent')
         except Exception as e:
             logging.exception('error found: %s', e)
