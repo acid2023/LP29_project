@@ -2,6 +2,7 @@ import os
 
 logs_folder = '/logs'
 models_folder = '/models'
+dict_folder = '/dict'
 
 
 def folder_check(folder: str) -> str:
