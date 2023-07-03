@@ -180,11 +180,19 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
 
 
 if __name__ == "__main__":
-    # telegram.Bot(token=ms.API_KEY)
-    logs_file = start_logging(screen=True)
-    logging.error('start')
     arguments = len(sys.argv)
     local_mode = arguments > 1 and sys.argv[1] == 'local'
+    if not local_mode:
+        try:
+            my_bot = telegram.Bot(token=ms.API_KEY)
+            logs_file = start_logging(screen=True, bot=my_bot)
+        except TelegramError as e:
+            logs_file = start_logging(screen=True)
+            logging.error('start')
+            logging.error('unable to initiate TelegramBot: %s' % e)
+    else:
+        logs_file = start_logging(screen=True)
+        logging.error('start')
     filename = False
     local_choice = False
     if arguments >= 3:

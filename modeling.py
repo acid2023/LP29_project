@@ -93,7 +93,6 @@ def preprocessing_trains(df: pd.DataFrame) -> pd.DataFrame:
     df['in_train'] = df['in_train'].fillna(1)
 
     logging.error('starting coding stations')
-    df = df[df['ops station'] != -904851]
     df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
     df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
     df.drop(['ops station'], axis=1, inplace=True)
@@ -231,13 +230,14 @@ def create_models(
             'scalers': scalers, 'metrics': metrics, 'scores': scores, 'columns': columns}
 
 
-def preprocessing_updates(df: pd.DataFrame) -> pd.DataFrame:
-    df.dropna(subset=['DLeft', 'ops station', 'o_road', 'to_home'], inplace=True)
+def preprocessing_updates(input: pd.DataFrame) -> pd.DataFrame:
+    df = input.copy()
+    df.dropna(subset=['DLeft', 'ops station', 'o_road'], inplace=True)
     df.reset_index(drop=True)
     df['in_train'] = df['in_train'].fillna(1)
 
     logging.error('starting coding stations')
-    df = df[df['ops station'] != -904851]
+    # df = df[df['ops station'] != -904851]
     df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
     df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
     df.drop(['ops station'], axis=1, inplace=True)
@@ -273,7 +273,7 @@ def prediction(df: pd.DataFrame) -> pd.DataFrame:
     for name, model in models_dict['models'].items():
         logging.info(f'predicting for model {name} started')
         update_X = update_trains[models_dict['columns'][name]]
-        update_X.dropna()
+        # update_X.dropna()
         update_X.reset_index(drop=True)
         update_Y = model.predict(update_X)
         logging.info(f'predicting for model {name} finished')
@@ -366,13 +366,40 @@ def validate_models(df: pd.DataFrame) -> pd.DataFrame:
     logging.error(f'resulting scores:\n{table}')
 
 
+def preprocessing_updates_post_modeling(input: pd.DataFrame) -> pd.DataFrame:
+    df = input.copy()
+    df.dropna(subset=['DLeft', 'ops station', 'o_road', 'to_home'], inplace=True)
+    df.reset_index(drop=True)
+    df['in_train'] = df['in_train'].fillna(1)
+
+    logging.error('starting coding stations')
+    # df = df[df['ops station'] != -904851]
+    df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
+    df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
+    df.drop(['ops station'], axis=1, inplace=True)
+    df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
+    df.reset_index(drop=True)
+    osm.save_coordinates_dict()
+    logging.info('finished coding stations')
+
+    df.drop(df.loc[df['update'] < pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
+    df.reset_index(drop=True)
+
+    logging.info('coverting update times')
+    df['keep_update'] = df['update']
+    df['update'] = pd.to_datetime(df['update']).apply(to_timestamp_days)
+    logging.info('finished converting update times')
+
+    return df.reset_index()
+
+
 def validating_on_post_data(df: pd.DataFrame) -> pd.DataFrame:
     logging.error('Loading models')
     models_dict = load_models()
     logging.error('Models loaded')
 
     logging.error('Started preprocessing')
-    trains = preprocessing_updates(df)
+    trains = preprocessing_updates_post_modeling(df)
     trains.reset_index()
     logging.error('Preprocessing done')
 
