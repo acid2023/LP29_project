@@ -39,8 +39,8 @@ filter_type = filter_types[2]
 DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update', 'in_train']
 
 TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update', 'in_train']
-TF_number_of_epochs = 75
-TF_batch_size = 128
+TF_number_of_epochs = 100
+TF_batch_size = 256
 TF_neurons = 512
 TF_learning_rate = 0.001
 TF_input_shape = (None, )
@@ -396,6 +396,65 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
         return model
 
+    def TensorFlow_KeraTune_Conv_3Flat():
+
+        num_conv_layers = 4
+        activations = ['relu', 'elu', 'selu', 'softplus']
+        units_filters = [16, 24, 32, 64, 96, 128]
+        num_dropouts = 1
+        dropout_rate = 0.1671256121594838
+        num_dense_layers = 2
+        l1_regularization = 0.1671256121594838
+        l2_regularization = 0.29732598490943557
+        
+        
+        input = keras.layers.Input(shape=(34))
+        x = keras.layers.BatchNormalization()(input)
+        x = tf.expand_dims(x, axis=2)
+        x = tf.expand_dims(x, axis=1)
+
+
+        # Add convolutional layers
+        for _ in range(num_conv_layers):
+            x = keras.layers.Conv1D(filters=32, kernel_size=1)(x)
+            x = keras.layers.Activation('selu')(x)
+            x = keras.layers.Dropout(0.30713858568974556)(x)
+            x = keras.layers.ActivityRegularization(l1=l1_regularization, l2=l2_regularization)(x)
+
+        # Add dropout layers
+        for _ in range(num_dropouts):
+            x = keras.layers.Dropout(dropout_rate)(x)
+
+        x = tf.squeeze(x, axis=1)
+
+        # Add transpose convolutional layers
+        for _ in range(num_conv_layers):
+            x = keras.layers.Conv1DTranspose(96, kernel_size=1)(x)
+            x = keras.layers.Activation('relu')(x)
+
+        x = keras.layers.Flatten()(x)
+
+        for _ in range(num_dense_layers):
+            x = keras.layers.BatchNormalization()(x)
+            x = keras.layers.Dense(128)(x)
+            x = keras.layers.Activation('selu')(x)
+            x = keras.layers.Dropout(0.30582557931042254)(x)
+            x = keras.layers.ActivityRegularization(l1=l1_regularization, l2=l2_regularization)(x)
+        
+        # Add remaining layers
+        x = keras.layers.Flatten()(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Dense(128)(x)
+        x = keras.layers.Activation('selu')(x)
+        output = keras.layers.Dense(1, activation='selu')(x)
+
+        model = keras.models.Model(inputs=input, outputs=output)
+
+        optimizer = keras.optimizers.Nadam(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        return model
+    
+    
     keras_models = {
         'TensorFlow_Relu_Elu_Selu_Nadam':
         CustomKerasRegressor(name='TensorFlow_Relu_Elu_Selu_Nadam', build_fn=TensorFlow_Relu_Elu_Selu_Nadam,
@@ -435,13 +494,16 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                              batch_size=128, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_4Matrix':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_4Matrix', build_fn=TensorFlow_KeraTune_Conv_4Matrix,
-                             batch_size=32, epochs=TF_number_of_epochs),
+                             batch_size=64, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_1Flat':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_1Flat', build_fn=TensorFlow_KeraTune_Conv_1Flat,
                              batch_size=256, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_2Flat':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_2Flat', build_fn=TensorFlow_KeraTune_Conv_2Flat,
-                             batch_size=32, epochs=TF_number_of_epochs)}
+                             batch_size=256, epochs=TF_number_of_epochs),
+        'TensorFlow_KeraTune_Conv_3Flat':
+        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_3Flat', build_fn=TensorFlow_KeraTune_Conv_3Flat,
+                             batch_size=256, epochs=TF_number_of_epochs)}
 
     for model in keras_models:
         models_dict[model] = keras_models[model]

@@ -18,6 +18,7 @@ import folders
 import modeling as md
 import modeling_settings as mds
 from bot import TelegramBotHandler
+import osm
 
 
 def start_logging(**kwarg: str | TelegramBotHandler) -> str:
@@ -68,12 +69,24 @@ def load_dataframe(filename):
     return df
 
 
+def check_coordinates(df: pd.DataFrame):
+    df.dropna(subset=['ops station', 'o_road'], inplace=True)
+    df.reset_index(drop=True)
+    unique_stations = df[~df.duplicated(subset=['ops station'])]
+    station_check = {}
+    for idx, row in unique_stations.iterrows():
+        coords = osm.fetch_coordinates(row['ops station'])
+        station_check[row['ops station']] = (coords, osm.road_check(coords, row['o_road']))
+    station_check = pd.DataFrame(station_check, index=['coords', 'check']).T
+    return station_check[station_check.check == False]
+
+
 def create_models(**kwargs: str | email.message.Message) -> None:
     logging.error('creating models')
     letter = kwargs.get('letter', False)
     filename = kwargs.get('filename', False)
     if not filename:
-        filename = 'TH_0105_2006'
+        filename = 'TH_0105_0507'
     local = kwargs.get('local', False)
     if letter:
         attachment = get_data_from_message(letter['message'], get_type='xlsx')
@@ -90,6 +103,19 @@ def create_models(**kwargs: str | email.message.Message) -> None:
         logging.error('local data loaded')
     else:
         return
+    coords_check = check_coordinates(df)
+    problem_stations = df_to_excel(coords_check)
+    if not coords_check.empty:
+        logging.error('there are problems with geodata for stations - wrong geodata parsed')
+        if letter:
+            send_letter(letter['sender'], 'problem stations', message_type='xlsx',
+                        attachment=problem_stations, filename='problem_stations.xlsx')
+            logging.error('problem stations sent')
+        else:
+            coords_check.to_excel('problem_stations.xlsx')
+            logging.error('problem stations saved')
+    else:
+        logging.error('no problems with parsed geodata for stations found')
     created_models_dict = md.create_models(df, mds.DefaultColumns)
     logging.error('models created')
     md.save_models(created_models_dict)
@@ -112,6 +138,19 @@ def predict_data(**kwargs: str | email.message.Message) -> None:
         logging.error('local data loaded')
     else:
         return
+    coords_check = check_coordinates(df)
+    problem_stations = df_to_excel(coords_check)
+    if not coords_check.empty:
+        logging.error('there are problems with geodata for stations - wrong geodata parsed')
+        if letter:
+            send_letter(letter['sender'], 'problem stations', message_type='xlsx',
+                        attachment=problem_stations, filename='problem_stations.xlsx')
+            logging.error('problem stations sent')
+        else:
+            coords_check.to_excel('problem_stations.xlsx')
+            logging.error('problem stations saved')
+    else:
+        logging.error('no problems with parsed geodata for stations found')
     forecast = md.prediction(df)
     logging.error('forecast completed')
     update_trains = df_to_excel(forecast)
@@ -121,7 +160,7 @@ def predict_data(**kwargs: str | email.message.Message) -> None:
                     attachment=update_trains, filename='update_trains_new.xlsx')
         logging.info('updates sent, no error found')
     if letter or local:
-        forecast.to_excel('update_trains.xlsx')
+        forecast.to_excel('update_trains_new.xlsx')
         logging.error('update saved locally')
 
 
@@ -153,7 +192,7 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
             elif user_athorized and letter['subject'] == ms.prediction_subject:
                 predict_data(letter=letter)
         if archive_list:
-            logging.errr('archiving messages from authorized users')
+            logging.error('archiving messages from authorized users')
             archiveing_and_removing_messages(archive_list)
     else:
         request = 'select action: (1) create/ (2)predict/ (3) validation test/ (4) post modeling validation/ (5) exit: '

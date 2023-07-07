@@ -3,6 +3,8 @@ import requests
 import logging
 import pickle
 from typing import Tuple
+from shapely.geometry import Point
+import geopandas as gpd
 
 import folders
 from folders import folder_check
@@ -12,12 +14,15 @@ station_coords = {}
 
 
 def load_dicts() -> None:
-    global dict_locations, dict_ops_id
+    global dict_locations, dict_ops_id, roads_areas
     path = folder_check(folders.dict_folder)
+    #path = 'Users/sergeykuzmin/projects/project/dict/'
     with open(f'{path}dict_locations.pkl', 'rb') as f:
         dict_locations = pickle.load(f)
     with open(f'{path}dict_ops_id.pkl', 'rb') as f:
         dict_ops_id = pickle.load(f)
+    with open(f'{path}roads_areas.pkl', 'rb') as f:
+        roads_areas = pickle.load(f)
 
 
 def save_coordinates_dict() -> None:
@@ -31,6 +36,7 @@ def save_coordinates_dict() -> None:
 def load_coordinates_dict() -> None:
     global station_coords
     path = folder_check(folders.dict_folder)
+   # path = 'Users/sergeykuzmin/projects/project/dict/'
     filename = f'{path}{coordinates_filename}'
     try:
         with open(filename, "rb") as f:
@@ -57,16 +63,16 @@ def fetch_coords_from_dicts(station: str) -> Tuple[float, float]:
 
     location = station.split(' ')[0].upper().rstrip()
     if ops_id:
-        coords = dict_ops_id.get(ops_id, None)
+        coords = dict_ops_id.get(ops_id, 0)
         ops_id_2 = ops_id[:-1]
         if coords:
             return coords
         else:
-            coords = dict_ops_id.get(ops_id_2, None)
+            coords = dict_ops_id.get(ops_id_2, 0)
             if coords:
                 return coords
 
-    coords_2 = dict_locations.get(location, None)
+    coords_2 = dict_locations.get(location, 0)
     if coords_2:
         return coords_2
 
@@ -83,7 +89,7 @@ def fetch_coordinates(station: str) -> Tuple[float, float]:
 
     results = fetch_coords_from_dicts(station)
 
-    if results:
+    if results != [None, None]:
         return results
 
     if station in station_coords:
@@ -105,11 +111,22 @@ def fetch_coordinates(station: str) -> Tuple[float, float]:
                 logging.error('problems parsing geodata')
                 return [0, 0]
         except Exception as e:
-            logging.exception('problems %s', e)
+            logging.exception(f'{station}problems %s', e)
             return [0, 0]
     except Exception as e:
-        logging.exception('problems %s', e)
+        logging.exception(f'{station}problems %s', e)
         return [0, 0]
+
+
+def road_check(coords, road):
+    if not road:
+        return False
+    global roads_areas
+    area = roads_areas[road]
+    lat, lon = coords
+    if not coords or (lat is None or lon is None):
+        return False
+    return area.contains(Point(lon, lat))
 
 
 load_coordinates_dict()

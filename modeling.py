@@ -93,8 +93,8 @@ def preprocessing_trains(df: pd.DataFrame) -> pd.DataFrame:
     df['in_train'] = df['in_train'].fillna(1)
 
     logging.error('starting coding stations')
-    df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
-    df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
+    df['ops_station_lat'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+    df['ops_station_lon'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
     df.drop(['ops station'], axis=1, inplace=True)
     df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
     df.reset_index(drop=True)
@@ -191,9 +191,14 @@ def create_models(
     path = folder_check(folders.models_folder)
 
     models = mds.declare_keras_models(mds.models, len(keras_columns_list), path)
-#   models = mds.models
-#   models = mds.declare_keras_models({}, len(keras_columns_list), path)
     TF_models_list = [model for model in models if model.startswith('TensorFlow')]
+
+# saving preprocessed data for experiments
+#   A = encoded_roads[keras_columns_list]
+#   b = encoded_roads['to_home']
+#   A.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/inputs.pkl')
+#   b.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/target.pkl')
+#   input()
 
     for name, model in models.items():
         logging.error(f'fitting model {name} started')
@@ -238,8 +243,8 @@ def preprocessing_updates(input: pd.DataFrame) -> pd.DataFrame:
 
     logging.error('starting coding stations')
     # df = df[df['ops station'] != -904851]
-    df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
-    df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
+    df['ops_station_lat'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+    df['ops_station_lon'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
     df.drop(['ops station'], axis=1, inplace=True)
     df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
     df.reset_index(drop=True)
@@ -273,7 +278,7 @@ def prediction(df: pd.DataFrame) -> pd.DataFrame:
     for name, model in models_dict['models'].items():
         logging.info(f'predicting for model {name} started')
         update_X = update_trains[models_dict['columns'][name]]
-        # update_X.dropna()
+        update_X.dropna()
         update_X.reset_index(drop=True)
         update_Y = model.predict(update_X)
         logging.info(f'predicting for model {name} finished')
@@ -374,8 +379,8 @@ def preprocessing_updates_post_modeling(input: pd.DataFrame) -> pd.DataFrame:
 
     logging.error('starting coding stations')
     # df = df[df['ops station'] != -904851]
-    df['ops_station_lat'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[0])
-    df['ops_station_lon'] = df['ops station'].apply(lambda x: osm.fetch_coordinates(x)[1])
+    df['ops_station_lat'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+    df['ops_station_lon'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
     df.drop(['ops station'], axis=1, inplace=True)
     df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
     df.reset_index(drop=True)
