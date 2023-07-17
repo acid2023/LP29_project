@@ -191,14 +191,15 @@ def create_models(
     path = folder_check(folders.models_folder)
 
     models = mds.declare_keras_models(mds.models, len(keras_columns_list), path)
+#    models = mds.declare_keras_models({}, len(keras_columns_list), path)
     TF_models_list = [model for model in models if model.startswith('TensorFlow')]
 
 # saving preprocessed data for experiments
-#   A = encoded_roads[keras_columns_list]
-#   b = encoded_roads['to_home']
-#   A.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/inputs.pkl')
-#   b.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/target.pkl')
-#   input()
+    A = trains
+    b = encoded_roads['to_home']
+    A.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/inputs_no_encode.pkl')
+    b.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/target.pkl')
+#    input()
 
     for name, model in models.items():
         logging.error(f'fitting model {name} started')

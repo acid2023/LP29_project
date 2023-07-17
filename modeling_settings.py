@@ -69,18 +69,15 @@ class CustomKerasRegressor(KerasRegressor, BaseEstimator, RegressorMixin):
             on_epoch_end=lambda epoch,
             logs: self.epoch_metrics_.update({epoch: {'loss': logs['loss'], 'val_loss': logs['val_loss']}}))
         early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=f"./tboard/logs1/{self.name_}")
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=f"./tboard/logs2/{self.name_}")
         if kwargs.get('callbacks', None) is None:
             kwargs['callbacks'] = []
-        kwargs['callbacks'].append(log_metrics)
+        # kwargs['callbacks'].append(log_metrics)
         kwargs['callbacks'].append(update_metrics)
         kwargs['callbacks'].append(early_stop)
         kwargs['callbacks'].append(tensorboard_callback)
 
-        if not self.name_.endswith('MultiInput'):
-            history = super().fit(X_train, y_train, **kwargs)
-        else:
-            history = super().fit(X, y, **kwargs)
+        history = super().fit(X, y, **kwargs)
 
         self.model_ = history.model
         return self.model_
@@ -114,9 +111,12 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
     def TensorFlow_Relu_Elu_Selu_Nadam() -> keras.Sequential:
         model = keras.Sequential([layers.BatchNormalization(),
                                   layers.Dense(TF_neurons, activation='relu', input_shape=(None, num_features)),
+                                  layers.BatchNormalization(),
                                   layers.Dense(TF_neurons, activation='elu'),
+                                  layers.Dropout(0.2),
                                   layers.BatchNormalization(),
                                   layers.Dense(TF_neurons, activation='selu'),
+                                  layers.BatchNormalization(),
                                   layers.Dense(1)])
         optimizer = keras.optimizers.Nadam(learning_rate=TF_learning_rate)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
@@ -125,6 +125,8 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
     def TensorFlow_Softplus_Nadam() -> keras.Sequential:
         model = keras.Sequential([layers.BatchNormalization(),
                                   layers.Dense(TF_neurons, activation='softplus', input_shape=(None, num_features)),
+                                  layers.BatchNormalization(),
+                                  layers.Dropout(0.2),
                                   layers.Dense(TF_neurons, activation='softplus'),
                                   layers.BatchNormalization(),
                                   layers.Dense(TF_neurons, activation='softplus'),
@@ -136,8 +138,11 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
     def TensorFlow_Synthetic() -> keras.Sequential:
         model = keras.Sequential([layers.BatchNormalization(),
                                   layers.Dense(TF_neurons, activation='relu', input_shape=(None, num_features)),
+                                  layers.BatchNormalization(),
+                                  layers.Dropout(0.2),
                                   layers.Dense(TF_neurons * 2, activation='softplus'),
                                   layers.BatchNormalization(),
+                                  layers.Dropout(0.2),
                                   layers.Dense(TF_neurons * 2, activation='relu'),
                                   layers.Dense(1)])
         optimizer = keras.optimizers.Adam(learning_rate=TF_learning_rate)
@@ -147,10 +152,13 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
     def TensorFlow_KeraTune_1() -> keras.Sequential:
         model = keras.Sequential([layers.BatchNormalization(),
                                   layers.Dense(192, activation='selu', input_shape=(None, num_features)),
+                                  layers.BatchNormalization(),
                                   layers.Dense(160, activation='selu'),
+                                  layers.Dropout(0.2),
                                   layers.Dense(224, activation='relu'),
                                   layers.BatchNormalization(),
                                   layers.Dense(96, activation='relu'),
+                                  layers.BatchNormalization(),
                                   layers.Dense(96, activation='softplus'),
                                   layers.Dense(1)])
         optimizer = keras.optimizers.Nadam(learning_rate=0.001)
@@ -160,12 +168,15 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
     def TensorFlow_KeraTune_2() -> keras.Sequential:
         model = keras.Sequential([layers.BatchNormalization(),
                                   layers.Dense(288, activation='relu', input_shape=(None, num_features)),
+                                  layers.Dropout(0.2),
                                   layers.Dense(416, activation='relu'),
+                                  layers.Dropout(0.2),
                                   layers.Dense(160, activation='selu'),
                                   layers.Dense(256, activation='softplus'),
                                   layers.BatchNormalization(),
                                   layers.Dense(256, activation='softplus'),
                                   layers.Dense(320, activation='softplus'),
+                                  layers.Dropout(0.2),
                                   layers.Dense(320, activation='relu'),
                                   layers.BatchNormalization(),
                                   layers.Dense(320, activation='softplus'),
@@ -399,20 +410,16 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
     def TensorFlow_KeraTune_Conv_3Flat():
 
         num_conv_layers = 4
-        activations = ['relu', 'elu', 'selu', 'softplus']
-        units_filters = [16, 24, 32, 64, 96, 128]
         num_dropouts = 1
         dropout_rate = 0.1671256121594838
         num_dense_layers = 2
         l1_regularization = 0.1671256121594838
         l2_regularization = 0.29732598490943557
-        
-        
+
         input = keras.layers.Input(shape=(34))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = tf.expand_dims(x, axis=1)
-
 
         # Add convolutional layers
         for _ in range(num_conv_layers):
@@ -440,7 +447,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
             x = keras.layers.Activation('selu')(x)
             x = keras.layers.Dropout(0.30582557931042254)(x)
             x = keras.layers.ActivityRegularization(l1=l1_regularization, l2=l2_regularization)(x)
-        
+
         # Add remaining layers
         x = keras.layers.Flatten()(x)
         x = keras.layers.BatchNormalization()(x)
@@ -453,8 +460,110 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
         return model
-    
-    
+
+    def TensorFlow_KeraTune_Conv_4Flat():
+        input = keras.layers.Input(shape=(34))
+        x = tf.expand_dims(input, axis=2)
+        x = keras.layers.SeparableConv1D(filters=32, kernel_size=1, activation='softplus')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Dropout(0.2)(x)
+        x = keras.layers.SeparableConv1D(filters=8, kernel_size=5, activation='tanh')(x)
+        x = keras.layers.Dropout(0.2)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1D(filters=24, kernel_size=3, activation='selu')(x)
+        x = keras.layers.Dropout(0.2)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1D(filters=16, kernel_size=5, activation='softplus')(x)
+        x = keras.layers.Dropout(0.2)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1DTranspose(filters=24, kernel_size=1, activation='selu')(x)
+        x = keras.layers.Dropout(0.2)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1DTranspose(filters=24, kernel_size=1, activation='relu')(x)
+        x = keras.layers.Flatten()(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Dense(units=128, activation='elu')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Dense(units=128, activation='selu')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Dense(units=64, activation='selu')(x)
+        output = keras.layers.Dense(1, activation='selu')(x)
+        model = keras.models.Model(inputs=input, outputs=output)
+        optimizer = keras.optimizers.Nadam(learning_rate=0.0001)
+        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        return model
+
+    def TensorFlow_KeraTune_Conv_5Flat():
+        input = keras.layers.Input(shape=(34))
+        x = keras.layers.BatchNormalization()(input)
+        x = tf.expand_dims(x, axis=2)
+        x = keras.layers.SeparableConv1D(filters=8, kernel_size=5, activation='tanh')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.SeparableConv1D(filters=32, kernel_size=3, activation='selu')(x)
+        x = keras.layers.SpatialDropout1D(0.2)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1D(filters=24, kernel_size=5, activation='tanh')(x)
+        x = keras.layers.SpatialDropout1D(0.4)(x)
+        x = keras.layers.SimpleRNN(units=64, return_sequences=True)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.LSTM(units=64, return_sequences=True)(x)
+        x = keras.layers.SpatialDropout1D(0.2)(x)
+        x = keras.layers.Conv1D(filters=16, kernel_size=3, activation='relu')(x)
+        x = keras.layers.SpatialDropout1D(0.4)(x)
+        x = keras.layers.SpatialDropout1D(0.4)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1DTranspose(filters=24, kernel_size=5, activation='tanh')(x)
+        x = keras.layers.Dropout(0.4)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Flatten()(x)
+        x = keras.layers.Dense(units=256, activation='tanh')(x)
+        x = keras.layers.Dense(units=128, activation='elu')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Dense(units=128, activation='relu')(x)
+        x = keras.layers.Dense(1, activation='elu')(x)
+        output = keras.layers.Dense(1, activation='selu')(x)
+        model = keras.models.Model(inputs=input, outputs=output)
+        optimizer = keras.optimizers.RMSprop(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        return model
+
+    def TensorFlow_KeraTune_Conv_6Flat():
+        input = keras.layers.Input(shape=(34))
+
+        x = keras.layers.BatchNormalization()(input)
+        x = tf.expand_dims(x, axis=2)
+        x = tf.expand_dims(x, axis=2)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.ConvLSTM1D(filters=64, kernel_size=1)(x)
+        x = keras.layers.SpatialDropout1D(rate=0.39476)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.SeparableConv1D(filters=64, kernel_size=1, activation='tanh')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1D(filters=64, kernel_size=1, activation='relu')(x)
+        x = keras.layers.SpatialDropout1D(rate=0.20179)(x)
+        x = keras.layers.SimpleRNN(units=32, return_sequences=True)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.LSTM(units=16, return_sequences=True)(x)
+        x = keras.layers.SpatialDropout1D(0.068672)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Conv1DTranspose(filters=24, kernel_size=5, activation='softplus')(x)
+        x = keras.layers.Dropout(0.43681)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Flatten()(x)
+        x = keras.layers.Dense(units=64, activation='sigmoid')(x)
+        x = keras.layers.Dense(units=512,activation='sigmoid')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.Dense(units=64, activation='softplus')(x)
+
+        output = keras.layers.Dense(1, activation='selu')(x)
+
+        model = keras.models.Model(inputs=input, outputs=output)
+
+        optimizer = keras.optimizers.RMSprop(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        return model
+
+
     keras_models = {
         'TensorFlow_Relu_Elu_Selu_Nadam':
         CustomKerasRegressor(name='TensorFlow_Relu_Elu_Selu_Nadam', build_fn=TensorFlow_Relu_Elu_Selu_Nadam,
@@ -503,7 +612,16 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                              batch_size=256, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_3Flat':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_3Flat', build_fn=TensorFlow_KeraTune_Conv_3Flat,
-                             batch_size=256, epochs=TF_number_of_epochs)}
+                             batch_size=256, epochs=TF_number_of_epochs),
+        'TensorFlow_KeraTune_Conv_4Flat':
+        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_4Flat', build_fn=TensorFlow_KeraTune_Conv_4Flat,
+                             batch_size=64, epochs=TF_number_of_epochs), #16
+        'TensorFlow_KeraTune_Conv_5Flat':
+        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_5Flat', build_fn=TensorFlow_KeraTune_Conv_5Flat,
+                             batch_size=64, epochs=TF_number_of_epochs), #16
+        'TensorFlow_KeraTune_Conv_6Flat':
+        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_6Flat', build_fn=TensorFlow_KeraTune_Conv_6Flat,
+                             batch_size=64, epochs=TF_number_of_epochs)} #32
 
     for model in keras_models:
         models_dict[model] = keras_models[model]
@@ -515,7 +633,7 @@ models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=4
           'DecisionTree': DecisionTreeRegressor(max_depth=1000, random_state=42),
           'KNeighbors': KNeighborsRegressor(n_neighbors=5),
           'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=300, max_depth=300),
-          'GradientBoosting': GradientBoostingRegressor(n_estimators=500, learning_rate=0.25, random_state=42),
+          'GradientBoosting': GradientBoostingRegressor(n_estimators=500, learning_rate=0.01, random_state=42),
           'Ridge': Ridge(alpha=1.0),
           'Lasso': Lasso(alpha=1.0),
           'Lars': Lars(n_nonzero_coefs=10),

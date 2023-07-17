@@ -9,6 +9,7 @@ import os
 import time
 import logging
 import email
+import select
 
 from mail import get_data_from_message, get_messages, send_letter, archiveing_and_removing_messages
 import mail_settings as ms
@@ -75,9 +76,12 @@ def check_coordinates(df: pd.DataFrame):
     unique_stations = df[~df.duplicated(subset=['ops station'])]
     station_check = {}
     for idx, row in unique_stations.iterrows():
-        coords = osm.fetch_coordinates(row['ops station'])
-        station_check[row['ops station']] = (coords, osm.road_check(coords, row['o_road']))
-    station_check = pd.DataFrame(station_check, index=['coords', 'check']).T
+        ops_station = row['ops station']
+        coords = osm.fetch_coordinates(ops_station)
+        o_road = row['o_road']
+        station_check[idx] = (ops_station, o_road, coords[0], coords[1], osm.road_check(coords, o_road))
+    station_check = pd.DataFrame(station_check).T
+    station_check.columns = ['ops station', 'o_road', 'lat', 'lon', 'check']
     return station_check[station_check.check == False]
 
 
@@ -243,8 +247,20 @@ if __name__ == "__main__":
     try:
         while True:
             main(local_mode, filename, local_choice)
-            if input('stop: (y/n)') == 'y':
+            start_time = time.time()
+            next_iteration = False
+            print('press any key or it restart loop in 10 minutes')
+            while True:
+                ready, _, _ = select.select([sys.stdin], [], [], 60)
+                if ready:
+                    break
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= 60:
+                next_iteration = True
                 break
+            if not next_iteration:
+                if input('stop: (y/n)') == 'y':
+                    break
             local_choice = False
     except (ValueError, AttributeError, TypeError, KeyError, IndexError) as e:
         logging.exception('error found: %s', e)

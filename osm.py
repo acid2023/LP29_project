@@ -4,7 +4,9 @@ import logging
 import pickle
 from typing import Tuple
 from shapely.geometry import Point
+from shapely.ops import unary_union
 import geopandas as gpd
+import pandas as pd
 
 import folders
 from folders import folder_check
@@ -16,13 +18,23 @@ station_coords = {}
 def load_dicts() -> None:
     global dict_locations, dict_ops_id, roads_areas
     path = folder_check(folders.dict_folder)
-    #path = 'Users/sergeykuzmin/projects/project/dict/'
     with open(f'{path}dict_locations.pkl', 'rb') as f:
         dict_locations = pickle.load(f)
     with open(f'{path}dict_ops_id.pkl', 'rb') as f:
         dict_ops_id = pickle.load(f)
     with open(f'{path}roads_areas.pkl', 'rb') as f:
         roads_areas = pickle.load(f)
+
+
+def save_dicts() -> None:
+    global dict_locations, dict_ops_id, roads_areas
+    path = folder_check(folders.dict_folder)
+    with open(f'{path}dict_locations.pkl', 'wb') as f:
+        pickle.dump(dict_locations, f)
+    with open(f'{path}dict_ops_id.pkl', 'wb') as f:
+        pickle.dump(dict_ops_id, f)
+    with open(f'{path}roads_areas.pkl', 'wb') as f:
+        pickle.dump(roads_areas, f)
 
 
 def save_coordinates_dict() -> None:
@@ -36,7 +48,6 @@ def save_coordinates_dict() -> None:
 def load_coordinates_dict() -> None:
     global station_coords
     path = folder_check(folders.dict_folder)
-   # path = 'Users/sergeykuzmin/projects/project/dict/'
     filename = f'{path}{coordinates_filename}'
     try:
         with open(filename, "rb") as f:
@@ -93,7 +104,8 @@ def fetch_coordinates(station: str) -> Tuple[float, float]:
         return results
 
     if station in station_coords:
-        return station_coords[station]
+        results = station_coords[station]
+        return results
 
     try:
         location = re.sub(pattern, "", station).strip()
@@ -122,11 +134,40 @@ def road_check(coords, road):
     if not road:
         return False
     global roads_areas
-    area = roads_areas[road]
+    area = roads_areas.get(road, None)
+    if area is None:
+        return False
     lat, lon = coords
     if not coords or (lat is None or lon is None):
         return False
     return area.contains(Point(lon, lat))
+
+
+def update_roads_areas(df: pd.DataFrame) -> None:
+    global roads_areas
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.coords[1], df.coords[0]))
+    gdf['buffer'] = gdf['geometry'].buffer(1)
+    for row in gdf.itertuples(index=False):
+        area = getattr(row, 'o_road')
+        buffer_zone = getattr(row, 'buffer')
+        if area in roads_areas:
+            roads_areas[area] = unary_union([roads_areas[area], buffer_zone])
+        else:
+            roads_areas[area] = buffer_zone
+    save_dicts()
+
+
+def update_coordinates_dict(df: pd.DataFrame) -> None:
+    global station_coords, dict_ops_id
+    for row in df.itertuples(index=False):
+        station = getattr(row, 'ops station')
+        station_index = getattr(row, 'station_index')
+        lat = getattr(row, 'lat')
+        lon = getattr(row, 'lon')
+        station_coords[station] = [lat, lon]
+        dict_ops_id[station_index] = [lat, lon]
+    save_coordinates_dict()
+    save_dicts()
 
 
 load_coordinates_dict()

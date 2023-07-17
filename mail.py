@@ -124,7 +124,10 @@ def get_data_from_message(message: bytes, **kwargs: str) -> Union[str, bytes] | 
         text_parts = []
         for part in message.walk():
             if part.get_content_type() == 'text/plain':
-                text_parts.append(part.get_payload(decode=True).decode('utf-8'))
+                try:
+                    text_parts.append(part.get_payload(decode=True).decode('utf-8'))
+                except UnicodeDecodeError:
+                    continue
             text = '\n'.join(text_parts)
         return text
     else:

@@ -5,8 +5,15 @@ __pycache__/
 models/
 logs/
 LP29/
-
+my_dir/
+tboard/
+/untitled_project
+/gridsearch
 *.log
 *.pkl
 *.h5
 *.xlsx
+all_way_model.py
+*.ipynb
+*.geojson
+different*
