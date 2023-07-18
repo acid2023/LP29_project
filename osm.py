@@ -57,17 +57,18 @@ def load_coordinates_dict() -> None:
         station_coords = {}
 
 
-def fetch_coords_from_dicts(station: str) -> Tuple[float, float]:
-    def get_code(location):
-        pattern = r'\((\d+)\)[^(]*$'
-        if not isinstance(location, str):
-            location = str(location)
-        match = re.search(pattern, location)
-        if match:
-            return match.group(1)
-        else:
-            return None
+def get_code(location):
+    pattern = r'\((\d+)\)[^(]*$'
+    if not isinstance(location, str):
+        location = str(location)
+    match = re.search(pattern, location)
+    if match:
+        return match.group(1)
+    else:
+        return None
 
+
+def fetch_coords_from_dicts(station: str) -> Tuple[float, float]:
     global dict_locations, dict_ops_id
 
     ops_id = get_code(station)
@@ -145,7 +146,12 @@ def road_check(coords, road):
 
 def update_roads_areas(df: pd.DataFrame) -> None:
     global roads_areas
-    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.coords[1], df.coords[0]))
+    geometry = []
+    for row in df.itertuples():
+        lat = getattr(row, 'lat')
+        lon = getattr(row, 'lon')
+        geometry.append(Point(lon, lat))
+    gdf = gpd.GeoDataFrame(df, geometry=geometry)
     gdf['buffer'] = gdf['geometry'].buffer(1)
     for row in gdf.itertuples(index=False):
         area = getattr(row, 'o_road')
@@ -160,12 +166,12 @@ def update_roads_areas(df: pd.DataFrame) -> None:
 def update_coordinates_dict(df: pd.DataFrame) -> None:
     global station_coords, dict_ops_id
     for row in df.itertuples(index=False):
-        station = getattr(row, 'ops station')
-        station_index = getattr(row, 'station_index')
+        station = getattr(row, 'ops_station')
+        ops_id = get_code(station)
         lat = getattr(row, 'lat')
         lon = getattr(row, 'lon')
         station_coords[station] = [lat, lon]
-        dict_ops_id[station_index] = [lat, lon]
+        dict_ops_id[ops_id] = [lat, lon]
     save_coordinates_dict()
     save_dicts()
 

@@ -103,7 +103,7 @@ def preprocessing_trains(df: pd.DataFrame) -> pd.DataFrame:
 
     df.drop(df.loc[df['update'] >= pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
     df.reset_index(drop=True)
-    logging.error('coverting update times')
+    logging.error('converting update times')
     df['update'] = pd.to_datetime(df['update']).apply(to_timestamp_days)
     logging.error('finished converting update times')
     return df.reset_index()
@@ -195,10 +195,10 @@ def create_models(
     TF_models_list = [model for model in models if model.startswith('TensorFlow')]
 
 # saving preprocessed data for experiments
-    A = trains
-    b = encoded_roads['to_home']
-    A.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/inputs_no_encode.pkl')
-    b.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/target.pkl')
+#    A = trains
+#    b = encoded_roads['to_home']
+#    A.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/inputs_no_encode.pkl')
+#    b.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/target.pkl')
 #    input()
 
     for name, model in models.items():
@@ -255,7 +255,7 @@ def preprocessing_updates(input: pd.DataFrame) -> pd.DataFrame:
     df.drop(df.loc[df['update'] < pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
     df.reset_index(drop=True)
 
-    logging.info('coverting update times')
+    logging.info('converting update times')
     df['keep_update'] = df['update']
     df['update'] = pd.to_datetime(df['update']).apply(to_timestamp_days)
     logging.info('finished converting update times')
@@ -391,7 +391,7 @@ def preprocessing_updates_post_modeling(input: pd.DataFrame) -> pd.DataFrame:
     df.drop(df.loc[df['update'] < pd.to_datetime(mds.DefaultTrainingDateCut)].index, inplace=True)
     df.reset_index(drop=True)
 
-    logging.info('coverting update times')
+    logging.info('converting update times')
     df['keep_update'] = df['update']
     df['update'] = pd.to_datetime(df['update']).apply(to_timestamp_days)
     logging.info('finished converting update times')
