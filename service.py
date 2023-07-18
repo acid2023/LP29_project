@@ -9,6 +9,7 @@ import os
 import time
 import logging
 import email
+# import select
 
 from mail import get_data_from_message, get_messages, send_letter, archiveing_and_removing_messages
 import mail_settings as ms
@@ -18,6 +19,7 @@ import folders
 import modeling as md
 import modeling_settings as mds
 from bot import TelegramBotHandler
+import osm
 
 
 def start_logging(**kwarg: str | TelegramBotHandler) -> str:
@@ -68,12 +70,44 @@ def load_dataframe(filename):
     return df
 
 
+def check_coordinates(df: pd.DataFrame):
+    df.dropna(subset=['ops station', 'o_road'], inplace=True)
+    df.reset_index(drop=True)
+    unique_stations = df[~df.duplicated(subset=['ops station'])]
+    station_check = {}
+    for idx, row in unique_stations.iterrows():
+        ops_station = row['ops station']
+        coords = osm.fetch_coordinates(ops_station)
+        o_road = row['o_road']
+        station_check[idx] = (ops_station, o_road, coords[0], coords[1], osm.road_check(coords, o_road))
+    station_check = pd.DataFrame(station_check).T
+    station_check.columns = ['ops_station', 'o_road', 'lat', 'lon', 'check']
+    return station_check[station_check.check == False]
+
+
+def check_geodata(df: pd.DataFrame, **kwargs) -> None:
+    letter = kwargs.get('letter', False)
+    coords_check = check_coordinates(df)
+    problem_stations = df_to_excel(coords_check)
+    if not coords_check.empty:
+        logging.error('there are problems with geodata for stations - wrong geodata parsed')
+        if letter:
+            send_letter(letter['sender'], 'problem stations', message_type='xlsx',
+                        attachment=problem_stations, filename='problem_stations.xlsx')
+            logging.error('problem stations sent')
+        else:
+            coords_check.to_excel('problem_stations.xlsx')
+            logging.error('problem stations saved')
+    else:
+        logging.error('no problems with parsed geodata for stations found')
+
+
 def create_models(**kwargs: str | email.message.Message) -> None:
     logging.error('creating models')
     letter = kwargs.get('letter', False)
     filename = kwargs.get('filename', False)
     if not filename:
-        filename = 'TH_0105_2006'
+        filename = 'TH_0105_0507'
     local = kwargs.get('local', False)
     if letter:
         attachment = get_data_from_message(letter['message'], get_type='xlsx')
@@ -90,6 +124,7 @@ def create_models(**kwargs: str | email.message.Message) -> None:
         logging.error('local data loaded')
     else:
         return
+    check_geodata(df, leter=letter)
     created_models_dict = md.create_models(df, mds.DefaultColumns)
     logging.error('models created')
     md.save_models(created_models_dict)
@@ -99,6 +134,7 @@ def create_models(**kwargs: str | email.message.Message) -> None:
 def predict_data(**kwargs: str | email.message.Message) -> None:
     letter = kwargs.get('letter', False)
     local = kwargs.get('local', False)
+    filename = kwargs.get('filename', False)
     logging.error('predicting data')
     if letter:
         attachment = get_data_from_message(letter['message'], get_type='xlsx')
@@ -112,6 +148,7 @@ def predict_data(**kwargs: str | email.message.Message) -> None:
         logging.error('local data loaded')
     else:
         return
+    check_geodata(df, letter=letter)
     forecast = md.prediction(df)
     logging.error('forecast completed')
     update_trains = df_to_excel(forecast)
@@ -121,8 +158,32 @@ def predict_data(**kwargs: str | email.message.Message) -> None:
                     attachment=update_trains, filename='update_trains_new.xlsx')
         logging.info('updates sent, no error found')
     if letter or local:
-        forecast.to_excel('update_trains.xlsx')
+        forecast.to_excel('update_trains_new.xlsx')
         logging.error('update saved locally')
+
+
+def geodata_update(**kwargs: str | email.message.Message) -> None:
+    letter = kwargs.get('letter', False)
+    local = kwargs.get('local', False)
+    filename = kwargs.get('filename', False)
+    logging.error('updating geodata')
+    if letter:
+        attachment = get_data_from_message(letter['message'], get_type='xlsx')
+        logging.error('attachement found')
+        xlsx_data = attachment[0]['data']
+        df = pd.read_excel(xlsx_data)
+        logging.error('loaded attachment')
+    elif local:
+        logging.error('loading local data')
+        df = load_dataframe(filename)
+        logging.error('local data loaded')
+    try:
+
+        osm.update_coordinates_dict(df)
+        osm.update_roads_areas(df)
+    except Exception as e:
+        logging.exception('error updating geodata: %s', e)
+    logging.error('geodata updated')
 
 
 def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> None:
@@ -152,11 +213,14 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
                 create_models(letter=letter)
             elif user_athorized and letter['subject'] == ms.prediction_subject:
                 predict_data(letter=letter)
+            elif user_athorized and letter['subject'] == ms.geodata_update_subject:
+                geodata_update(letter=letter)
         if archive_list:
-            logging.errr('archiving messages from authorized users')
+            logging.error('archiving messages from authorized users')
             archiveing_and_removing_messages(archive_list)
     else:
-        request = 'select action: (1) create/ (2)predict/ (3) validation test/ (4) post modeling validation/ (5) exit: '
+        request = ('select action: (1) create/ (2)predict/ (3) validation test/ '
+                   '(4) post modeling validation/ (5) update geopdata/ (6) exit: ')
         if not local_choice:
             select_action = input(request)
         else:
@@ -176,15 +240,25 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
             df = load_dataframe(filename)
             md.validating_on_post_data(df)
         elif select_action == '5':
+            geodata_update(local=True, filename=filename)
+        elif select_action == '6':
             exit(0)
 
 
 if __name__ == "__main__":
-    # telegram.Bot(token=ms.API_KEY)
-    logs_file = start_logging(screen=True)
-    logging.error('start')
     arguments = len(sys.argv)
     local_mode = arguments > 1 and sys.argv[1] == 'local'
+    if not local_mode:
+        try:
+            my_bot = telegram.Bot(token=ms.API_KEY)
+            logs_file = start_logging(screen=True, bot=my_bot)
+        except TelegramError as e:
+            logs_file = start_logging(screen=True)
+            logging.error('start')
+            logging.error('unable to initiate TelegramBot: %s' % e)
+    else:
+        logs_file = start_logging(screen=True)
+        logging.error('start')
     filename = False
     local_choice = False
     if arguments >= 3:
@@ -196,8 +270,22 @@ if __name__ == "__main__":
     try:
         while True:
             main(local_mode, filename, local_choice)
-            if input('stop: (y/n)') == 'y':
+            start_time = time.time()
+            next_iteration = False
+            '''
+            print('press any key or it restart loop in 10 minutes')
+            while True:
+                ready, _, _ = select.select([sys.stdin], [], [], 60)
+                if ready:
+                    break
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= 60:
+                next_iteration = True
                 break
+            '''
+            if not next_iteration:
+                if input('stop: (y/n)') == 'y':
+                    break
             local_choice = False
     except (ValueError, AttributeError, TypeError, KeyError, IndexError) as e:
         logging.exception('error found: %s', e)
