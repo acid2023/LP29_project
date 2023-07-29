@@ -96,6 +96,17 @@ def preprocessing_trains(df: pd.DataFrame) -> pd.DataFrame:
     df['ops_station_lat'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
     df['ops_station_lon'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
     df.drop(['ops station'], axis=1, inplace=True)
+
+    if 'start' in df.columns:
+        df['start_lat'] = df['start'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+        df['start_lon'] = df['start'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
+        df.drop(['start'], axis=1, inplace=True)
+
+    if 'dest' in df.columns:
+        df['dest_lat'] = df['dest'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+        df['dest_lon'] = df['dest'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
+        df.drop(['dest'], axis=1, inplace=True)
+
     df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
     df.reset_index(drop=True)
     osm.save_coordinates_dict()
@@ -194,12 +205,11 @@ def create_models(
 #    models = mds.declare_keras_models({}, len(keras_columns_list), path)
     TF_models_list = [model for model in models if model.startswith('TensorFlow')]
 
-# saving preprocessed data for experiments
-#    A = trains
-#    b = encoded_roads['to_home']
-#    A.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/inputs_no_encode.pkl')
-#    b.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/target.pkl')
-#    input()
+ # saving preprocessed data for experiments
+    A = encoded_roads[keras_columns_list]
+    b = encoded_roads['to_home']
+    A.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/inputs_no_encode.pkl')
+    b.to_pickle('/Users/sergeykuzmin/projects/project/LP29_project/target.pkl')
 
     for name, model in models.items():
         logging.error(f'fitting model {name} started')
@@ -247,6 +257,17 @@ def preprocessing_updates(input: pd.DataFrame) -> pd.DataFrame:
     df['ops_station_lat'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
     df['ops_station_lon'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
     df.drop(['ops station'], axis=1, inplace=True)
+    
+    if 'start' in df.columns:
+        df['start_lat'] = df['start'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+        df['start_lon'] = df['start'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
+        df.drop(['start'], axis=1, inplace=True)
+
+    if 'dest' in df.columns:
+        df['dest_lat'] = df['dest'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+        df['dest_lon'] = df['dest'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
+        df.drop(['dest'], axis=1, inplace=True)
+
     df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
     df.reset_index(drop=True)
     osm.save_coordinates_dict()
@@ -383,6 +404,17 @@ def preprocessing_updates_post_modeling(input: pd.DataFrame) -> pd.DataFrame:
     df['ops_station_lat'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
     df['ops_station_lon'] = df['ops station'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
     df.drop(['ops station'], axis=1, inplace=True)
+        
+    if 'start' in df.columns:
+        df['start_lat'] = df['start'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+        df['start_lon'] = df['start'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
+        df.drop(['start'], axis=1, inplace=True)
+
+    if 'dest' in df.columns:
+        df['dest_lat'] = df['dest'].apply(lambda x: float(osm.fetch_coordinates(x)[0]))
+        df['dest_lon'] = df['dest'].apply(lambda x: float(osm.fetch_coordinates(x)[1]))
+        df.drop(['dest'], axis=1, inplace=True)
+        
     df.dropna(subset=['ops_station_lat', 'ops_station_lon'], inplace=True)
     df.reset_index(drop=True)
     osm.save_coordinates_dict()

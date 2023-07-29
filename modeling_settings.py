@@ -36,9 +36,9 @@ DefaultTrainingDateCut = '2023-05-30'
 filter_types = ['savgol', 'butter', 'none']
 filter_type = filter_types[2]
 
-DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update', 'in_train']
+DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'start_lat', 'start_lon', 'dest_lat', 'dest_lon','update', 'in_train']
 
-TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update', 'in_train']
+TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'start_lat', 'start_lon', 'dest_lat', 'dest_lon', 'update', 'in_train']
 TF_number_of_epochs = 100
 TF_batch_size = 256
 TF_neurons = 512
@@ -46,6 +46,7 @@ TF_learning_rate = 0.001
 TF_input_shape = (None, )
 
 
+#class CustomKerasRegressor(KerasRegressor, BaseEstimator, RegressorMixin):
 class CustomKerasRegressor(KerasRegressor, BaseEstimator, RegressorMixin):
     def __init__(self, name, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -96,9 +97,9 @@ class MyPreprocessingLayer(keras.layers.Layer):
 
     def call(self, inputs):
         def apply_make_matrix(row):
-            features = row[:5]
+            features = row[:-29]
             features = tf.reshape(features, (-1, 1))
-            location = row[5:]
+            location = row[-29:]
             location = tf.reshape(location, (1, -1))  # Reshape location tensor
             result = tf.multiply(features, location)
             return result
@@ -227,7 +228,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
 
     def TensorFlow_KeraTune_Conv_2() -> keras.Sequential:
 
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(input, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -250,7 +251,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         return model
 
     def TenserFlow_KeraTune_Conv_3() -> keras.Sequential:
-        inputs = keras.layers.Input(shape=(None, 34))
+        inputs = keras.layers.Input(shape=(None, num_features))
         x1 = keras.layers.Dense(32, activation='relu')(inputs)
         reshaped_inputs = keras.layers.Reshape((2, 2, 8))(x1)
         conv_layer = keras.layers.Conv1D(filters=32, kernel_size=2, activation='relu')(reshaped_inputs)
@@ -270,7 +271,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
 
     def TensorFlow_KeraTune_Conv_4():
         model = keras.Sequential()
-        model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh', input_shape=(34, 1)))
+        model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh', input_shape=(num_features, 1)))
         model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh'))
         model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh'))
         model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh'))
@@ -360,7 +361,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         return model
 
     def TensorFlow_KeraTune_Conv_1Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -386,7 +387,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         return model
 
     def TensorFlow_KeraTune_Conv_2Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -416,7 +417,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         l1_regularization = 0.1671256121594838
         l2_regularization = 0.29732598490943557
 
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -462,7 +463,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         return model
 
     def TensorFlow_KeraTune_Conv_4Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = tf.expand_dims(input, axis=2)
         x = keras.layers.SeparableConv1D(filters=32, kernel_size=1, activation='softplus')(x)
         x = keras.layers.BatchNormalization()(x)
@@ -494,7 +495,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         return model
 
     def TensorFlow_KeraTune_Conv_5Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = keras.layers.SeparableConv1D(filters=8, kernel_size=5, activation='tanh')(x)
@@ -528,7 +529,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         return model
 
     def TensorFlow_KeraTune_Conv_6Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
 
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
