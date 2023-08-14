@@ -138,7 +138,11 @@ def road_check(coords, road):
     area = roads_areas.get(road, None)
     if area is None:
         return False
-    lat, lon = coords
+    if len(coords) == 2:
+        lat = coords[0]
+        lon = coords[1]
+    else:
+        return False
     if not coords or (lat is None or lon is None):
         return False
     return area.contains(Point(lon, lat))

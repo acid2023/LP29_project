@@ -1,4 +1,5 @@
 import pandas as pd
+import tensorflow as tf
 
 import telegram
 from telegram.error import TelegramError
@@ -125,9 +126,10 @@ def create_models(**kwargs: str | email.message.Message) -> None:
     else:
         return
     check_geodata(df, leter=letter)
-    created_models_dict = md.create_models(df, mds.DefaultColumns)
+    # created_models_dict = md.create_models(df, mds.DefaultColumns)
+    md.create_2_way_models(df)
     logging.error('models created')
-    md.save_models(created_models_dict)
+    # md.save_models(created_models_dict)
     logging.error('no errors found, models saved')
 
 
@@ -246,6 +248,18 @@ def main(local_mode: bool, filename: str | bool, local_choice: str | bool) -> No
 
 
 if __name__ == "__main__":
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        print('GPU is available')
+        # Set the GPU as the default device
+        device = gpus[0]
+        tf.config.experimental.set_memory_growth(device, False)
+        tf.config.experimental.set_virtual_device_configuration(
+           device,
+           [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=0.75)])
+        # tf.config.experimental.set_memory_growth(gpus[0], True)
+    else:
+        print('GPU is not available')
     arguments = len(sys.argv)
     local_mode = arguments > 1 and sys.argv[1] == 'local'
     if not local_mode:

@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 
 from tensorflow import keras
 from keras import layers
-from keras.wrappers.scikit_learn import KerasRegressor
+from scikeras.wrappers import KerasRegressor
 import tensorflow as tf
 
 import pandas as pd
@@ -32,59 +32,46 @@ def log_settings() -> None:
         f.write(str(module_text))
 
 
-DefaultTrainingDateCut = '2023-05-30'
+DefaultTrainingDateCut = '2023-06-15'
 filter_types = ['savgol', 'butter', 'none']
 filter_type = filter_types[2]
 
 DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update', 'in_train']
 
 TF_DefaultColumns = ['DLeft', 'ops_station_lat', 'ops_station_lon', 'update', 'in_train']
-TF_number_of_epochs = 100
-TF_batch_size = 256
+TF_number_of_epochs = 150
+TF_batch_size = 512
 TF_neurons = 512
 TF_learning_rate = 0.001
 TF_input_shape = (None, )
 
 
 class CustomKerasRegressor(KerasRegressor, BaseEstimator, RegressorMixin):
-    def __init__(self, name, **kwargs) -> None:
+    def __init__(self, build_fn, name, **kwargs) -> None:
         super().__init__(**kwargs)
+        self.model_builder = build_fn
         self.model_ = None
+        self.kwargs = kwargs
         self.name_ = name
 
     def fit(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> keras.Sequential:
-
-        if not self.name_.endswith('MultiInput'):
-            X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-            X_train = tf.convert_to_tensor(X_train, dtype=tf.float32)
-            y_train = tf.convert_to_tensor(y_train, dtype=tf.float32)
-            X_val = tf.convert_to_tensor(X_val, dtype=tf.float32)
-            y_val = tf.convert_to_tensor(y_val, dtype=tf.float32)
-            kwargs['validation_data'] = (X_val, y_val)
-        self.epoch_metrics_ = {}
-        log_metrics = keras.callbacks.LambdaCallback(
-            on_epoch_end=lambda epoch,
-            logs: logging.info(f'Epoch {epoch}: {logs}'))
-        update_metrics = keras.callbacks.LambdaCallback(
-            on_epoch_end=lambda epoch,
-            logs: self.epoch_metrics_.update({epoch: {'loss': logs['loss'], 'val_loss': logs['val_loss']}}))
-        early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+        self.model = self.model_builder()
+        early_stop = keras.callbacks.EarlyStopping(monitor='val_loss', patience=25, restore_best_weights=True)
         tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=f"./tboard/logs2/{self.name_}")
         if kwargs.get('callbacks', None) is None:
             kwargs['callbacks'] = []
-        # kwargs['callbacks'].append(log_metrics)
-        kwargs['callbacks'].append(update_metrics)
         kwargs['callbacks'].append(early_stop)
         kwargs['callbacks'].append(tensorboard_callback)
+        for key, value in self.kwargs.items():
+            kwargs[key] = value
+        self.model.fit(X, y, **kwargs)
+        return self
 
-        history = super().fit(X, y, **kwargs)
+    def predict(self, X, **kwargs):
+        return self.model.predict(X, **kwargs)
 
-        self.model_ = history.model
-        return self.model_
-
-    def get_min_val_loss_epoch(self) -> int:
-        min_val_loss_epoch = min(self.epoch_metrics_, key=lambda x: self.epoch_metrics_[x]['val_loss'])
-        return min_val_loss_epoch
+    def save(self, *args):
+        self.model.save(*args)
 
 
 class MyPreprocessingLayer(keras.layers.Layer):
@@ -96,9 +83,9 @@ class MyPreprocessingLayer(keras.layers.Layer):
 
     def call(self, inputs):
         def apply_make_matrix(row):
-            features = row[:5]
+            features = row[:-29]
             features = tf.reshape(features, (-1, 1))
-            location = row[5:]
+            location = row[-29:]
             location = tf.reshape(location, (1, -1))  # Reshape location tensor
             result = tf.multiply(features, location)
             return result
@@ -118,7 +105,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                                   layers.Dense(TF_neurons, activation='selu'),
                                   layers.BatchNormalization(),
                                   layers.Dense(1)])
-        optimizer = keras.optimizers.Nadam(learning_rate=TF_learning_rate)
+        optimizer = tf.keras.optimizers.legacy.Nadam(learning_rate=TF_learning_rate)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
@@ -131,7 +118,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                                   layers.BatchNormalization(),
                                   layers.Dense(TF_neurons, activation='softplus'),
                                   layers.Dense(1)])
-        optimizer = keras.optimizers.Nadam(learning_rate=TF_learning_rate)
+        optimizer = tf.keras.optimizers.legacy.Nadam(learning_rate=TF_learning_rate)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
@@ -145,7 +132,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                                   layers.Dropout(0.2),
                                   layers.Dense(TF_neurons * 2, activation='relu'),
                                   layers.Dense(1)])
-        optimizer = keras.optimizers.Adam(learning_rate=TF_learning_rate)
+        optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=TF_learning_rate)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
@@ -161,7 +148,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                                   layers.BatchNormalization(),
                                   layers.Dense(96, activation='softplus'),
                                   layers.Dense(1)])
-        optimizer = keras.optimizers.Nadam(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.legacy.Nadam(learning_rate=0.001)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
@@ -181,7 +168,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                                   layers.BatchNormalization(),
                                   layers.Dense(320, activation='softplus'),
                                   layers.Dense(1)])
-        optimizer = keras.optimizers.Adam(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
         model.compile(loss='mean_squared_error', optimizer=optimizer)
         return model
 
@@ -220,14 +207,14 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
 
         model.add(keras.layers.Dense(1))
 
-        optimizer = keras.optimizers.RMSprop(learning_rate=0.0001)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.RMSprop(learning_rate=0.0001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
 
         return model
 
     def TensorFlow_KeraTune_Conv_2() -> keras.Sequential:
 
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(input, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -243,14 +230,14 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         x = keras.layers.Dense(units=96, activation='tanh')(x)
         output = keras.layers.Dense(1, activation='relu')(x)
 
-        optimizer = keras.optimizers.RMSprop(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.legacy.RMSprop(learning_rate=0.001)
         model = keras.models.Model(inputs=input, outputs=output)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
 
         return model
 
     def TenserFlow_KeraTune_Conv_3() -> keras.Sequential:
-        inputs = keras.layers.Input(shape=(None, 34))
+        inputs = keras.layers.Input(shape=(None, num_features))
         x1 = keras.layers.Dense(32, activation='relu')(inputs)
         reshaped_inputs = keras.layers.Reshape((2, 2, 8))(x1)
         conv_layer = keras.layers.Conv1D(filters=32, kernel_size=2, activation='relu')(reshaped_inputs)
@@ -263,14 +250,14 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         dense_layer = keras.layers.Dense(units=288, activation='relu')(dense_layer)
         dense_layer = keras.layers.Dense(units=288, activation='relu')(dense_layer)
         outputs = keras.layers.Dense(units=1)(dense_layer)
-        optimizer = keras.optimizers.RMSprop(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.legacy.RMSprop(learning_rate=0.001)
         model = keras.models.Model(inputs=inputs, outputs=outputs)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
         return model
 
     def TensorFlow_KeraTune_Conv_4():
         model = keras.Sequential()
-        model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh', input_shape=(34, 1)))
+        model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh', input_shape=(num_features, 1)))
         model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh'))
         model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh'))
         model.add(keras.layers.Conv1D(64, kernel_size=3, activation='tanh'))
@@ -279,7 +266,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         model.add(keras.layers.BatchNormalization())
         model.add(keras.layers.Dense(units=128, activation='sigmoid'))
         model.add(keras.layers.Dense(units=1))
-        model.compile(optimizer='adam', loss='mae', metrics=['mae'])
+        model.compile(optimizer='adam', loss='mse', metrics=['mae'])
         return model
 
     def TensorFlow_KeraTune_Conv_1Matrix():
@@ -295,8 +282,8 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         model.add(keras.layers.Dense(units=128, activation='elu'))
         model.add(keras.layers.Dense(1))
 
-        optimizer = keras.optimizers.Adam(learning_rate=0.0001)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.0001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
 
         return model
 
@@ -313,8 +300,8 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         model.add(keras.layers.Dense(units=96, activation='softplus'))
         model.add(keras.layers.Dense(1))
 
-        optimizer = keras.optimizers.Nadam(learning_rate=0.01)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.Nadam(learning_rate=0.01)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
 
         return model
 
@@ -332,7 +319,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         model.add(keras.layers.Dense(units=96, activation='elu'))
         model.add(keras.layers.Dense(1))
 
-        optimizer = keras.optimizers.Nadam(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.legacy.Nadam(learning_rate=0.001)
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
 
         return model
@@ -354,13 +341,13 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         model.add(keras.layers.Dense(units=128, activation='softplus'))
         model.add(keras.layers.Dense(1))
 
-        optimizer = keras.optimizers.Adam(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
         model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
 
         return model
 
     def TensorFlow_KeraTune_Conv_1Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -380,13 +367,13 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         output = keras.layers.Dense(1, activation='selu')(x)
 
         model = keras.models.Model(inputs=input, outputs=output)
-        optimizer = keras.optimizers.Adam(learning_rate=0.001)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
 
         return model
 
     def TensorFlow_KeraTune_Conv_2Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -401,10 +388,10 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         x = keras.layers.BatchNormalization()(x)
         x = keras.layers.Dense(units=96, activation='tanh')(x)
         output = keras.layers.Dense(1, activation='relu')(x)
-        optimizer = keras.optimizers.RMSprop(learning_rate=0.001)
+        optimizer = tf.keras.optimizers.legacy.RMSprop(learning_rate=0.001)
 
         model = keras.models.Model(inputs=input, outputs=output)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
         return model
 
     def TensorFlow_KeraTune_Conv_3Flat():
@@ -416,7 +403,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         l1_regularization = 0.1671256121594838
         l2_regularization = 0.29732598490943557
 
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = tf.expand_dims(x, axis=1)
@@ -457,12 +444,12 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
 
         model = keras.models.Model(inputs=input, outputs=output)
 
-        optimizer = keras.optimizers.Nadam(learning_rate=0.001)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.Nadam(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
         return model
 
     def TensorFlow_KeraTune_Conv_4Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = tf.expand_dims(input, axis=2)
         x = keras.layers.SeparableConv1D(filters=32, kernel_size=1, activation='softplus')(x)
         x = keras.layers.BatchNormalization()(x)
@@ -489,12 +476,12 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         x = keras.layers.Dense(units=64, activation='selu')(x)
         output = keras.layers.Dense(1, activation='selu')(x)
         model = keras.models.Model(inputs=input, outputs=output)
-        optimizer = keras.optimizers.Nadam(learning_rate=0.0001)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.Nadam(learning_rate=0.0001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
         return model
 
     def TensorFlow_KeraTune_Conv_5Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
         x = keras.layers.SeparableConv1D(filters=8, kernel_size=5, activation='tanh')(x)
@@ -523,12 +510,12 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         x = keras.layers.Dense(1, activation='elu')(x)
         output = keras.layers.Dense(1, activation='selu')(x)
         model = keras.models.Model(inputs=input, outputs=output)
-        optimizer = keras.optimizers.RMSprop(learning_rate=0.001)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.RMSprop(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
         return model
 
     def TensorFlow_KeraTune_Conv_6Flat():
-        input = keras.layers.Input(shape=(34))
+        input = keras.layers.Input(shape=(num_features))
 
         x = keras.layers.BatchNormalization()(input)
         x = tf.expand_dims(x, axis=2)
@@ -551,7 +538,7 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
         x = keras.layers.BatchNormalization()(x)
         x = keras.layers.Flatten()(x)
         x = keras.layers.Dense(units=64, activation='sigmoid')(x)
-        x = keras.layers.Dense(units=512,activation='sigmoid')(x)
+        x = keras.layers.Dense(units=512, activation='sigmoid')(x)
         x = keras.layers.BatchNormalization()(x)
         x = keras.layers.Dense(units=64, activation='softplus')(x)
 
@@ -559,12 +546,13 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
 
         model = keras.models.Model(inputs=input, outputs=output)
 
-        optimizer = keras.optimizers.RMSprop(learning_rate=0.001)
-        model.compile(optimizer=optimizer, loss='mae', metrics=['mae', 'mse'])
+        optimizer = tf.keras.optimizers.legacy.RMSprop(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae', 'mse'])
         return model
 
 
-    keras_models = {
+#{
+        '''
         'TensorFlow_Relu_Elu_Selu_Nadam':
         CustomKerasRegressor(name='TensorFlow_Relu_Elu_Selu_Nadam', build_fn=TensorFlow_Relu_Elu_Selu_Nadam,
                              batch_size=TF_batch_size, epochs=TF_number_of_epochs),
@@ -591,45 +579,54 @@ def declare_keras_models(models_dict: Dict[str, object], num_features: int, file
                              batch_size=TF_batch_size, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_4':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_4', build_fn=TensorFlow_KeraTune_Conv_4,
-                             batch_size=256, epochs=TF_number_of_epochs),
-        'TensorFlow_KeraTune_Conv_1Matrix':
-        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_1Matrix', build_fn=TensorFlow_KeraTune_Conv_1Matrix,
-                             batch_size=256, epochs=TF_number_of_epochs),
-        'TensorFlow_KeraTune_Conv_2Matrix':
-        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_2Matrix', build_fn=TensorFlow_KeraTune_Conv_2Matrix,
-                             batch_size=128, epochs=TF_number_of_epochs),
-        'TensorFlow_KeraTune_Conv_3Matrix':
-        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_3Matrix', build_fn=TensorFlow_KeraTune_Conv_3Matrix,
-                             batch_size=128, epochs=TF_number_of_epochs),
-        'TensorFlow_KeraTune_Conv_4Matrix':
-        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_4Matrix', build_fn=TensorFlow_KeraTune_Conv_4Matrix,
-                             batch_size=64, epochs=TF_number_of_epochs),
-        'TensorFlow_KeraTune_Conv_1Flat':
+                             batch_size=TF_batch_size, epochs=TF_number_of_epochs),
+                             '''
+    keras_models =     {'TensorFlow_KeraTune_Conv_1Flat':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_1Flat', build_fn=TensorFlow_KeraTune_Conv_1Flat,
-                             batch_size=256, epochs=TF_number_of_epochs),
+                             batch_size=TF_batch_size, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_2Flat':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_2Flat', build_fn=TensorFlow_KeraTune_Conv_2Flat,
-                             batch_size=256, epochs=TF_number_of_epochs),
+                             batch_size=TF_batch_size, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_3Flat':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_3Flat', build_fn=TensorFlow_KeraTune_Conv_3Flat,
-                             batch_size=256, epochs=TF_number_of_epochs),
+                             batch_size=TF_batch_size, epochs=TF_number_of_epochs),
         'TensorFlow_KeraTune_Conv_4Flat':
         CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_4Flat', build_fn=TensorFlow_KeraTune_Conv_4Flat,
-                             batch_size=64, epochs=TF_number_of_epochs), #16
-        'TensorFlow_KeraTune_Conv_5Flat':
-        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_5Flat', build_fn=TensorFlow_KeraTune_Conv_5Flat,
-                             batch_size=64, epochs=TF_number_of_epochs), #16
-        'TensorFlow_KeraTune_Conv_6Flat':
-        CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_6Flat', build_fn=TensorFlow_KeraTune_Conv_6Flat,
-                             batch_size=64, epochs=TF_number_of_epochs)} #32
+                             batch_size=TF_batch_size, epochs=TF_number_of_epochs)#,  # 16
+        #'TensorFlow_KeraTune_Conv_5Flat':
+        #CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_5Flat', build_fn=TensorFlow_KeraTune_Conv_5Flat,
+        #                   batch_size=TF_batch_size, epochs=TF_number_of_epochs)#,  # 16
+                            # 'TensorFlow_KeraTune_Conv_6Flat':
+                            # CustomKerasRegressor(name='TensorFlow_KeraTune_Conv_6Flat', build_fn=TensorFlow_KeraTune_Conv_6Flat,
+                            # batch_size=TF_batch_size, epochs=TF_number_of_epochs)
+                        } # 32
+    new_dict = models_dict.copy()
+    for model in keras_models.keys():
+        new_dict[model] = keras_models[model]
 
-    for model in keras_models:
-        models_dict[model] = keras_models[model]
-
-    return models_dict
+    return new_dict
 
 
-models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=42, max_depth=1000),
+PCA_models = {
+    'RandomForest': RandomForestRegressor(n_estimators=300, random_state=42, max_depth=1000),
+          'DecisionTree': DecisionTreeRegressor(max_depth=1000, random_state=42),
+          'KNeighbors': KNeighborsRegressor(n_neighbors=5),
+          'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=300, max_depth=300),
+          'GradientBoosting': GradientBoostingRegressor(n_estimators=500, learning_rate=0.01, random_state=42),
+          'Ridge': Ridge(alpha=1.0),
+          'Lasso': Lasso(alpha=1.0),
+          'Lars': Lars(n_nonzero_coefs=10),
+          'OrthogonalMatchingPursuit': OrthogonalMatchingPursuit(),
+          'BayesianRidge': BayesianRidge(),
+          'ARDRegression': ARDRegression(),
+          'PassiveAggressiveRegressor': PassiveAggressiveRegressor(),
+          'RANSACRegressor': RANSACRegressor(),
+          'ElasticNet': ElasticNet(),
+          'LassoLars': LassoLars(),
+          'AdaBoost': AdaBoostRegressor(random_state=42, n_estimators=500)}
+
+no_PCA_models = {
+    'RandomForest': RandomForestRegressor(n_estimators=300, random_state=42, max_depth=1000),
           'DecisionTree': DecisionTreeRegressor(max_depth=1000, random_state=42),
           'KNeighbors': KNeighborsRegressor(n_neighbors=5),
           'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=300, max_depth=300),
@@ -647,6 +644,25 @@ models = {'RandomForest': RandomForestRegressor(n_estimators=300, random_state=4
           'AdaBoost': AdaBoostRegressor(random_state=42, n_estimators=500)}
 
 
-sklearn_list = list(models.keys())
+stay_models = {
+    'RandomForest': RandomForestRegressor(n_estimators=300, random_state=42, max_depth=1000),
+          'DecisionTree': DecisionTreeRegressor(max_depth=1000, random_state=42),
+          'KNeighbors': KNeighborsRegressor(n_neighbors=5),
+          'ExtraTrees': ExtraTreesRegressor(random_state=42, n_estimators=300, max_depth=300),
+          'GradientBoosting': GradientBoostingRegressor(n_estimators=500, learning_rate=0.01, random_state=42),
+          'Ridge': Ridge(alpha=1.0),
+          'Lasso': Lasso(alpha=1.0),
+          'Lars': Lars(n_nonzero_coefs=10),
+          'OrthogonalMatchingPursuit': OrthogonalMatchingPursuit(),
+          'BayesianRidge': BayesianRidge(),
+          'ARDRegression': ARDRegression(),
+          'PassiveAggressiveRegressor': PassiveAggressiveRegressor(),
+          'RANSACRegressor': RANSACRegressor(),
+          'ElasticNet': ElasticNet(),
+          'LassoLars': LassoLars(),
+          'AdaBoost': AdaBoostRegressor(random_state=42, n_estimators=500)}
+
+models = list(PCA_models.keys())
+sklearn_list = list(PCA_models.keys())
 
 log_settings()
